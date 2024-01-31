@@ -48,6 +48,26 @@ fviz_eig(PC.pca, addlabels = TRUE, ylim = c(0, 50))
 var <- get_pca_var(PC.pca)
 fviz_pca_var(PC.pca, col.var = "black")
 
+#------ Tentative de rotation --------
+head(var$coord, 4)
+F1 <- var$coord[, 1]
+F2 <- var$coord[, 2]
+F <- cbind(F1, F2)
+
+# On veut récupérer le vecteur Z tel que Z=FU où U est la matrice de rotation adaptée
+# Pour construire U on se réfère à ...
+gamma1=F[2,1]
+gamma2=F[2,2]
+alpha1=gamma1/(gamma1+gamma2)
+alpha2=gamma1/(gamma1+gamma2)
+beta1=-alpha2*var(F2)/(alpha1*var(F1)-alpha2*var(F2))
+beta2=alpha1*var(F1)/(alpha1*var(F1)-alpha2*var(F2))
+
+z1=alpha1*F1+alpha2*F2
+z2=beta1*F1+beta2*F2
+
+Z=cbind(z1,z2)
+
 #------ Récupération de la surprise ------
 
 #On utilise la méthode de https://www.ijcb.org/journal/ijcb05q2a2.pdf
