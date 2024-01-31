@@ -11,9 +11,9 @@ library("tidyverse")
 
 #Il faut peut-être changer les chemins ...
 
-press_release <- read_excel(here("Statapp-BDF/Dataset_EA-MPD.xlsx"), sheet = "Press Release Window")
-press_conference <- read_excel(here("Statapp-BDF/Dataset_EA-MPD.xlsx"), sheet = "Press Conference Window")
-monetary_event <- read_excel(here("Statapp-BDF/Dataset_EA-MPD.xlsx"), sheet = "Monetary Event Window")
+press_release <- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Press Release Window")
+press_conference <- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Press Conference Window")
+monetary_event <- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Monetary Event Window")
 
 
 #-------------------
@@ -65,9 +65,14 @@ alpha2=gamma1/(gamma1+gamma2)
 beta1=-alpha2*var(F2)/(alpha1*var(F1)-alpha2*var(F2))
 beta2=alpha1*var(F1)/(alpha1*var(F1)-alpha2*var(F2))
 
+# ATTENTION : il faut avant standardiser les colonnes de U
+U=cbind(c(alpha1,alpha2),c(beta1,beta2))
 z1=alpha1*F1+alpha2*F2
 z2=beta1*F1+beta2*F2
 
 Z=cbind(z1,z2)
 
 # Il s'agit enfin de standardiser Z. Pour ce, les auteurs de l'article effectuent deux régressions
+
+
+
