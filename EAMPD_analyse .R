@@ -50,6 +50,7 @@ fviz_pca_var(PC.pca, col.var = "black")
 
 #------ Tentative de rotation --------
 head(var$coord, 4)
+loadings_matrix=var$contrib[,1:2]
 F1 <- var$coord[, 1]
 F2 <- var$coord[, 2]
 F <- cbind(F1, F2)
@@ -58,8 +59,8 @@ F <- cbind(F1, F2)
 # Pour construire U on se réfère à "The impact of ECB monetary policy decisions and
 # communication on the yield curve"
 
-gamma1=F[2,1]
-gamma2=F[2,2]
+gamma1=loadings_matrix[2,1]
+gamma2=loadings_matrix[2,2]
 alpha1=gamma1/(gamma1+gamma2)
 alpha2=gamma1/(gamma1+gamma2)
 beta1=-alpha2*var(F2)/(alpha1*var(F1)-alpha2*var(F2))
@@ -67,6 +68,8 @@ beta2=alpha1*var(F1)/(alpha1*var(F1)-alpha2*var(F2))
 
 # ATTENTION : il faut avant standardiser les colonnes de U
 U=cbind(c(alpha1,alpha2),c(beta1,beta2))
+
+
 z1=alpha1*F1+alpha2*F2
 z2=beta1*F1+beta2*F2
 
