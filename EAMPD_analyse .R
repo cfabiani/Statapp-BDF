@@ -86,4 +86,4 @@ d=a
 U_main=cbind(c(a,b),c(c,d))
 z1_main=a*F1+b*F2
 z2_main=c*F1+d*F2
-Z_main=cbind(z1,z2) # Par je ne sais quel miracle c'est la même matrice que Z
+Z_main=cbind(z1_main,z2_main) # Par je ne sais quel miracle c'est la même matrice que Z
