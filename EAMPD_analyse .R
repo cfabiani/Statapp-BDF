@@ -48,7 +48,7 @@ fviz_eig(PC.pca, addlabels = TRUE, ylim = c(0, 50))
 var <- get_pca_var(PC.pca)
 fviz_pca_var(PC.pca, col.var = "black")
 
-#------ Tentative de rotation --------
+#------ Tentative de rotation --------#
 head(var$coord, 4)
 loadings_matrix=var$contrib[,1:2]
 F1 <- var$coord[, 1]
@@ -77,5 +77,13 @@ Z=cbind(z1,z2)
 
 # Il s'agit enfin de standardiser Z. Pour ce, les auteurs de l'article effectuent deux régressions
 
-
-
+#------ Matrice de rotation d'après mes calculs à la main ------#
+gamma=sqrt(gamma1^2+gamma2^2)
+a=gamma1/gamma
+b=gamma2/gamma
+c=-b
+d=a
+U_main=cbind(c(a,b),c(c,d))
+z1_main=a*F1+b*F2
+z2_main=c*F1+d*F2
+Z_main=cbind(z1,z2) # Par je ne sais quel miracle c'est la même matrice que Z
