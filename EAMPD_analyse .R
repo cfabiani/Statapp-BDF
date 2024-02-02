@@ -11,9 +11,9 @@ library("tidyverse")
 
 #Il faut peut-être changer les chemins ...
 
-press_release <- read_excel(here("Statapp-BDF/Dataset_EA-MPD.xlsx"), sheet = "Press Release Window")
-press_conference <- read_excel(here("Statapp-BDF/Dataset_EA-MPD.xlsx"), sheet = "Press Conference Window")
-monetary_event <- read_excel(here("Statapp-BDF/Dataset_EA-MPD.xlsx"), sheet = "Monetary Event Window")
+press_release <- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Press Release Window")
+press_conference <- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Press Conference Window")
+monetary_event <- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Monetary Event Window")
 
 
 #-------------------
@@ -48,55 +48,42 @@ fviz_eig(PC.pca, addlabels = TRUE, ylim = c(0, 50))
 var <- get_pca_var(PC.pca)
 fviz_pca_var(PC.pca, col.var = "black")
 
-#------ Récupération de la surprise ------
-
-#On utilise la méthode de https://www.ijcb.org/journal/ijcb05q2a2.pdf
-#Voir partie 2, surtout 2.2 et 2.3 + annexe
-#L'idée est de faire l'ACP, de récupérer les deux composantes principales F1 et F2
-#Et de faire une "rotation" pour récupérer Z1 et Z2 où Z1 représente la surprise
-
-#On utilise le package psych pour la rotation
-install.packages("psych")
-library("psych")
-
-#On rescale (pour avoir mean = 0, sd = 1)
-press_conference_work_scaled <- scale(press_conference_work)
-#On fait l'ACP
-PC.pca_2 <- prcomp(press_conference_work_scaled)
-#On récupère les deux vecteurs F1 et F2
-F1 <- PC.pca_2$x[, 1]
-F2 <- PC.pca_2$x[, 2]
-
-
-#On rescale F1 et F2
-F1_scaled <- F1/sd(F1)
-F2_scaled <- F2/sd(F2)
-
-#On les fusionne
+#------ Tentative de rotation --------#
+head(var$coord, 4)
+loadings_matrix=var$contrib[,1:2]
+F1 <- var$coord[, 1]
+F2 <- var$coord[, 2]
 F <- cbind(F1, F2)
 
-#On fait la rotation
-rotation <- varimax(F)
+# On veut récupérer le vecteur Z tel que Z=FU où U est la matrice de rotation adaptée
+# Pour construire U on se réfère à "The impact of ECB monetary policy decisions and
+# communication on the yield curve"
 
-# On récupère  Z1 et Z2
-Z1 <- rotation$loadings[, 1]
-Z2 <- rotation$loadings[, 2]
+gamma1=loadings_matrix[2,1]
+gamma2=loadings_matrix[2,2]
+alpha1=gamma1/(gamma1+gamma2)
+alpha2=gamma2/(gamma1+gamma2)
+beta1=-alpha2*var(F2)/(alpha1*var(F1)-alpha2*var(F2))
+beta2=alpha1*var(F1)/(alpha1*var(F1)-alpha2*var(F2))
 
-Z1_scaled <- Z1/sd(Z1)
-Z2_scaled <- Z2/sd(Z2)
-
-#On obtient Z1 un vecteur de longueur 20 qui correspond à la surprise aux 20 dates.
-#Verifier si cette méthode correspond bien à celle de l'article
+# ATTENTION : il faut avant standardiser les colonnes de U
+U=cbind(c(alpha1,alpha2),c(beta1,beta2))
 
 
-#-----Tentative autre méthode ------
+z1=alpha1*F1+alpha2*F2
+z2=beta1*F1+beta2*F2
 
-#Visiblement dans psych il existe une commande qui fait tout
-acp.varimax <- principal(r=press_conference_work, nfactors=2, rotate="varimax")
+Z=cbind(z1,z2)
 
-Z1_bis <- acp.varimax$loadings[,1]
-Z2_bis <- acp.varimax$loadings[,2]
+# Il s'agit enfin de standardiser Z. Pour ce, les auteurs de l'article effectuent deux régressions
 
-#Mais le résultat est incohérent car on a des vecteurs de taille 46 
-#(le nombre de colonnes et les colonnes correspondent aux instruments OIS_3M OIS_1Y etc.)
-#Or la surprise doit dépendre de la date de la conférence pas de l'instrument je pense
+#------ Matrice de rotation d'après mes calculs à la main ------#
+gamma=sqrt(gamma1^2+gamma2^2)
+a=gamma1/gamma
+b=gamma2/gamma
+c=-b
+d=a
+U_main=cbind(c(a,b),c(c,d))
+z1_main=a*F1+b*F2
+z2_main=c*F1+d*F2
+Z_main=cbind(z1_main,z2_main) 
