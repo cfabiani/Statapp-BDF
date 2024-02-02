@@ -62,7 +62,7 @@ F <- cbind(F1, F2)
 gamma1=loadings_matrix[2,1]
 gamma2=loadings_matrix[2,2]
 alpha1=gamma1/(gamma1+gamma2)
-alpha2=gamma1/(gamma1+gamma2)
+alpha2=gamma2/(gamma1+gamma2)
 beta1=-alpha2*var(F2)/(alpha1*var(F1)-alpha2*var(F2))
 beta2=alpha1*var(F1)/(alpha1*var(F1)-alpha2*var(F2))
 
