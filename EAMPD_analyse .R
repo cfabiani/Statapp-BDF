@@ -35,10 +35,11 @@ press_conference_2009 <- press_conference %>%
 
 
 #On garde tout sauf les dates
-dates=format(press_conference_2009$date, "%Y-%m-%d")
+press_conference_2009$date=format(press_conference_2009$date, "%Y-%m-%d")
+date=press_conference_2009$date
 press_conference_work <- press_conference_2009[2:46]
 press_conference_work=t(press_conference_work)
-colnames(press_conference_work)=dates
+colnames(press_conference_work)=date
 
 #------- Avec Facto extra, première visualisation --------#
 #On récupère les valeurs propres et on plot pour avoir un aperçu
@@ -89,4 +90,25 @@ d=a
 U_main=cbind(c(a,b),c(c,d))
 z1_main=a*F1+b*F2
 z2_main=c*F1+d*F2
-Z_main=cbind(z1_main,z2_main) 
+Z_main=cbind(date,z1_main,z2_main) 
+
+df_final=merge(press_conference_2009, Z_main, by="date")
+
+# ------ Scaling ------ #
+# Selon l'article "Measuring Euro Area Monetary Policy", on pondère les vecteurs trouvés, pour que
+# une augmentation de un point de z1 soit associée à une augmentation de 1% du 1 month OIS
+# une augmentation de un point de z2 soit associée à une augmentation de 1% du 2 year OIS.
+
+#scaling_vector1= press_conference_2009$OIS_1M 
+#scaling_vector2=press_conference_2009$OIS_2Y 
+
+mod_lin1=lm(OIS_1M~z1_main, data=df_final)
+
+summary(mod_lin1)
+
+
+
+
+
+
+
