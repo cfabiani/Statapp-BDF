@@ -100,3 +100,6 @@ Z2_bis <- acp.varimax$loadings[,2]
 #Mais le résultat est incohérent car on a des vecteurs de taille 46 
 #(le nombre de colonnes et les colonnes correspondent aux instruments OIS_3M OIS_1Y etc.)
 #Or la surprise doit dépendre de la date de la conférence pas de l'instrument je pense
+
+
+#Test
