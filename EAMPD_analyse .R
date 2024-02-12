@@ -35,7 +35,10 @@ press_conference_2009 <- press_conference %>%
 
 
 #On garde tout sauf les dates
-press_conference_work <- t(press_conference_2009[2:46])
+dates=format(press_conference_2009$date, "%Y-%m-%d")
+press_conference_work <- press_conference_2009[2:46]
+press_conference_work=t(press_conference_work)
+colnames(press_conference_work)=dates
 
 #------- Avec Facto extra, première visualisation --------#
 #On récupère les valeurs propres et on plot pour avoir un aperçu
