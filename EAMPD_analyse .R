@@ -6,10 +6,14 @@ library("factoextra")
 library("lubridate")
 library("dplyr")
 library("tidyverse")
+library("ggplot2")
+install.packages("psych")
+library("psych")
+
 #Loading the datasets
 
 
-#Il faut peut-être changer les chemins ...
+# Chargement des bases de données
 
 press_release <- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Press Release Window")
 press_conference <- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Press Conference Window")
@@ -17,42 +21,50 @@ monetary_event <- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Monetary Even
 
 
 #-------------------
-#Je fais l'ACP sur la press_conference juste pour essayer
+# ACP sur la base monetary event #
 #-------------------
 
 #Création de variables de dates utilisables
-press_conference["date"] <- ymd(press_conference$date)
-press_conference["year"] <- year(press_conference$date)
-press_conference["month"] <- month(press_conference$date)
-press_conference["day"] <- day(press_conference$date)
+monetary_event["date"] <- ymd(monetary_event$date)
+monetary_event["year"] <- year(monetary_event$date)
+monetary_event["month"] <- month(monetary_event$date)
+monetary_event["day"] <- day(monetary_event$date)
 
-#Je garde que les valeurs après 2009 car il y a des NA avant
-#Il faudra rerefléchir à ce filtre
-#Vérifier si on a pas d'autres missings values
-press_conference_2009 <- press_conference %>%
+# On ne garde que les valeurs à partir de 2009 (Mars 2016 ?)
+monetary_event_2009 <- monetary_event %>%
   filter(year >= 2009)
 
 
 
 #On garde tout sauf les dates
-press_conference_2009$date=format(press_conference_2009$date, "%Y-%m-%d")
-date=press_conference_2009$date
-press_conference_work <- press_conference_2009[2:46]
-press_conference_work=t(press_conference_work)
-colnames(press_conference_work)=date
+
+monetary_event_2009$date=format(press_conference_2009$date, "%Y-%m-%d")
+date=monetary_event_2009$date
+monetary_event_work <- monetary_event_2009[2:15]
+monetary_event_work=t(monetary_event_work)
+colnames(monetary_event_work)=date
 
 #------- Avec Facto extra, première visualisation --------#
 #On récupère les valeurs propres et on plot pour avoir un aperçu
-PC.pca <- PCA(press_conference_work, graph = FALSE) 
+PC.pca <- PCA(monetary_event_work, scale.unit = TRUE, graph = FALSE) 
 #print(PC.pca)
 eig.val <- get_eigenvalue(PC.pca)
 #print(eig.val)
-fviz_eig(PC.pca, addlabels = TRUE, ylim = c(0, 50))
+fviz_eig(PC.pca, addlabels = TRUE, ylim = c(0, 60))
 
 var <- get_pca_var(PC.pca)
 fviz_pca_var(PC.pca, col.var = "black")
 
-#------ Tentative de rotation --------#
+ind=get_pca_ind(PC.pca)
+fviz_pca_ind(PC.pca, repel=TRUE)
+fviz_contrib(PC.pca, choice = "ind", axes = 1)
+fviz_contrib(PC.pca, choice = "ind", axes = 2)
+
+#------ Autre méthode ------#
+monetary_event_work2 = scale(monetary_event_work)
+PC.pca_2 <- prcomp(monetary_event_work2)
+
+#------ Tentative de rotation ------#
 head(var$coord, 4)
 loadings_matrix=var$contrib[,1:2]
 F1 <- var$coord[, 1]
@@ -77,7 +89,7 @@ U=cbind(c(alpha1,alpha2),c(beta1,beta2))
 z1=alpha1*F1+alpha2*F2
 z2=beta1*F1+beta2*F2
 
-Z=cbind(z1,z2)
+Z=cbind(date,z1,z2)
 
 # Il s'agit enfin de standardiser Z. Pour ce, les auteurs de l'article effectuent deux régressions
 
@@ -93,7 +105,7 @@ z2_main=c*F1+d*F2
 Z_main=cbind(date,z1_main,z2_main) 
 
 df_final=merge(press_conference_2009, Z_main, by="date")
-
+df_final2=merge(press_conference_2009, Z, by="date")
 # ------ Scaling ------ #
 # Selon l'article "Measuring Euro Area Monetary Policy", on pondère les vecteurs trouvés, pour que
 # une augmentation de un point de z1 soit associée à une augmentation de 1% du 1 month OIS
@@ -102,13 +114,15 @@ df_final=merge(press_conference_2009, Z_main, by="date")
 #scaling_vector1= press_conference_2009$OIS_1M 
 #scaling_vector2=press_conference_2009$OIS_2Y 
 
-mod_lin1=lm(OIS_1M~z1_main, data=df_final)
+reg=lm(OIS_1M~z1_main, data=df_final)
 
-summary(mod_lin1)
+summary(reg)
 
+plot1=ggplot(df_final, aes(x = z1_main, y = OIS_1M)) +
+  geom_point()
 
-
-
+plot2=ggplot(df_final2, aes(x = z1, y = OIS_1M)) +
+  geom_point(color='blue')
 
 
 
