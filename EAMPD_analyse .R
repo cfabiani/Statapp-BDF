@@ -29,8 +29,7 @@ monetary_event["day"] <- day(monetary_event$date)
 #Il faudra rerefléchir à ce filtre
 #Vérifier si on a pas d'autres missings values
 monetary_event_2012 <- monetary_event %>%
-  filter(year >= 2012)
-
+  filter(year >= 2016)
 
 
 #On garde tout sauf les dates
@@ -50,6 +49,12 @@ fviz_eig(PC.pca, addlabels = TRUE, ylim = c(0, 50))
 var <- get_pca_var(PC.pca)
 fviz_pca_var(PC.pca, col.var = "black")
 
+#-----------------
+# Contributions of variables to PC1
+fviz_contrib(PC.pca, choice = "var", axes = 1, top = 15)
+# Contributions of variables to PC2
+fviz_contrib(PC.pca, choice = "var", axes = 2, top = 15)
+
 #------ Récupération de la surprise ------
 
 #On utilise la méthode de https://www.ijcb.org/journal/ijcb05q2a2.pdf
@@ -58,11 +63,10 @@ fviz_pca_var(PC.pca, col.var = "black")
 #Et de faire une "rotation" pour récupérer Z1 et Z2 où Z1 représente la surprise
 
 #On utilise le package psych pour la rotation
-install.packages("psych")
 library("psych")
 
 #On rescale (pour avoir mean = 0, sd = 1)
-monetary_event_work <- scale(monetary_event_work)
+monetary_event_work_scaled <- scale(monetary_event_work)
 #On fait l'ACP
 PC.pca_2 <- prcomp(monetary_event_work_scaled)
 #On récupère les deux vecteurs F1 et F2
@@ -93,82 +97,137 @@ Z2_scaled <- Z2/sd(Z2)
 #Verifier si cette méthode correspond bien à celle de l'article
 
 
-#--------------
+#-------------- New
 
 F1 <- PC.pca_2$x[, 1]
 F2 <- PC.pca_2$x[, 2]
-
-loadings_matrix  <- PC.pca_2$rotation
-mp1_loadings <- loadings_matrix[,c("PC1")]
-
-gamma1 <- mp1_loadings[1] 
-gamma2 <- mp1_loadings[2]
-
 F1_scaled <- F1/sd(F1)
 F2_scaled <- F2/sd(F2)
 
-alpha1=gamma1/(gamma1+gamma2)
-alpha2=gamma2/(gamma1+gamma2)
-beta1=-alpha2*var(F2_scaled)/(alpha1*var(F1_scaled)-alpha2*var(F2_scaled))
-beta2=alpha1*var(F1_scaled)/(alpha1*var(F1_scaled)-alpha2*var(F2_scaled))
-
-z1=alpha1*F1_scaled+alpha2*F2_scaled
-z2=beta1*F1_scaled+beta2*F2_scaled
-
-#-----Tentative autre méthode ------
-
-#------ Tentative de rotation --------#
-head(var$coord, 4)
-loadings_matrix=var$contrib[,1:2]
-F1 <- var$coord[, 1]
-F2 <- var$coord[, 2]
-F <- cbind(F1, F2)
-
-# On veut récupérer le vecteur Z tel que Z=FU où U est la matrice de rotation adaptée
-# Pour construire U on se réfère à "The impact of ECB monetary policy decisions and
-# communication on the yield curve"
-
-gamma1=loadings_matrix[2,1]
-gamma2=loadings_matrix[2,2]
-alpha1=gamma1/(gamma1+gamma2)
-alpha2=gamma2/(gamma1+gamma2)
-beta1=-alpha2*var(F2)/(alpha1*var(F1)-alpha2*var(F2))
-beta2=alpha1*var(F1)/(alpha1*var(F1)-alpha2*var(F2))
-
-# ATTENTION : il faut avant standardiser les colonnes de U
-U=cbind(c(alpha1,alpha2),c(beta1,beta2))
 
 
-z1=alpha1*F1+alpha2*F2
-z2=beta1*F1+beta2*F2
+press_release["date"] <- ymd(press_release$date)
+press_release["year"] <- year(press_release$date)
+press_release["month"] <- month(press_release$date)
+press_release["day"] <- day(press_release$date)
 
-Z=cbind(z1,z2)
+#Je garde que les valeurs après 2009 car il y a des NA avant
+#Il faudra rerefléchir à ce filtre
+#Vérifier si on a pas d'autres missings values
+press_release <- press_release %>%
+  filter(year >= 2016)
 
-# Il s'agit enfin de standardiser Z. Pour ce, les auteurs de l'article effectuent deux régressions
+press_release$F1 <- F1_scaled
+press_release$F2 <- F2_scaled
 
-#------ Matrice de rotation d'après mes calculs à la main ------#
-gamma=sqrt(gamma1^2+gamma2^2)
-a=gamma1/gamma
-b=gamma2/gamma
-c=-b
-d=a
-U_main=cbind(c(a,b),c(c,d))
-z1_main=a*F1+b*F2
-z2_main=c*F1+d*F2
-Z_main=cbind(date,z1_main,z2_main) 
+F_bis <- cbind(F1_scaled,F2_scaled)
 
-df_final=merge(monetary_event_work, Z_main, by="date")
 
-# ------ Scaling ------ #
-# Selon l'article "Measuring Euro Area Monetary Policy", on pondère les vecteurs trouvés, pour que
-# une augmentation de un point de z1 soit associée à une augmentation de 1% du 1 month OIS
-# une augmentation de un point de z2 soit associée à une augmentation de 1% du 2 year OIS.
+model <- lm(OIS_1M ~ F1, data = press_release)
+summary(model)
 
-#scaling_vector1= press_conference_2009$OIS_1M 
-#scaling_vector2=press_conference_2009$OIS_2Y 
 
-mod_lin1=lm(OIS_1M~z1_main, data=df_final)
 
-summary(mod_lin1)
+#-------------------------
+
+
+monetary_event_long <- monetary_event[1:15] %>% 
+  pivot_longer(cols = -date, names_to = "instrument", values_to = "interest")
+
+
+ 
+
+table_graph <- monetary_event_long %>%
+  filter(date %in% c( "2022-10-27","2022-12-15","2023-03-16"))
+
+table_graph$date <- as.factor(table_graph$date)
+
+
+table_graph$instrument <- factor(table_graph$instrument, levels = colnames(monetary_event)[-1])
+
+ggplot(table_graph, aes(x = instrument, y = interest, group = date, color = date)) +
+  geom_line() +
+  scale_color_manual(values = c( "2022-10-27" = "green","2022-12-15" = "red", "2023-03-16" = "blue")) +
+  labs(title = "Surprise causée par l'annonce de politique monétaire à différentes dates", x = "Maturité de l'OIS", y = "Valeur du choc") +
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+
+monetary_event_2020 <- monetary_event %>%
+  filter(year >=2020)
+
+ggplot(monetary_event_2020, aes(x = date )) +
+  geom_line(aes(y = OIS_1M, color = ))+
+  theme_bw()
+
+
+
+#-----------------
+
+#Bon fit de press release
+
+vars <- colnames(press_release)[2:15]  
+
+get_regression_results <- function(dependent_var, independent_var) {
+  model <- lm(formula(paste(dependent_var, "~", independent_var)), data = press_release)
+  coef <- coef(model)[2]
+  p_value <- summary(model)$coefficients[2, 4]
+  r_squared <- summary(model)$r.squared
+  if (p_value <= 0.01) {
+    significance <- "***"
+  } else if (p_value <= 0.05) {
+    significance <- "**"
+  } else if (p_value <= 0.10) {
+    significance <- "*"
+  } else {
+    significance <- ""
+  }
+  return(c(Coefficient = coef, `P-value` = p_value, `R-squared` = r_squared, Significance = significance))
+}
+
+results_F1 <- sapply(vars, function(var) get_regression_results(var, "F1"))
+results_F2 <- sapply(vars, function(var) get_regression_results(var, "F2"))
+results_table_F1 <- t(as.data.frame(results_F1))
+results_table_F2 <- t(as.data.frame(results_F2))
+print(results_table_F1)
+print(results_table_F2)
+
+#Bon fit de press conference
+
+press_conference["date"] <- ymd(press_conference$date)
+press_conference["year"] <- year(press_conference$date)
+press_conference["month"] <- month(press_conference$date)
+press_conference["day"] <- day(press_conference$date)
+
+press_conference <- press_conference %>%
+  filter(year >= 2016)
+press_conference$F1 <- F1_scaled
+press_conference$F2 <- F2_scaled
+
+vars_pc <- colnames(press_conference)[2:15]  
+
+get_regression_results_pc <- function(dependent_var, independent_var) {
+  model <- lm(formula(paste(dependent_var, "~", independent_var)), data = press_conference)
+  coef <- coef(model)[2] 
+  p_value <- summary(model)$coefficients[2, 4]
+  r_squared <- summary(model)$r.squared
+  if (p_value <= 0.01) {
+    significance <- "***"
+  } else if (p_value <= 0.05) {
+    significance <- "**"
+  } else if (p_value <= 0.10) {
+    significance <- "*"
+  } else {
+    significance <- ""
+  }
+  #return(c(Coefficient = coef, `P-value` = p_value, `R-squared` = r_squared, Significance = significance))
+}
+
+results_F1_pc <- sapply(vars_pc, function(var) get_regression_results_pc(var, "F1"))
+results_F2_pc <- sapply(vars_pc, function(var) get_regression_results_pc(var, "F2"))
+results_table_F1_pc <- t(as.data.frame(results_F1_pc))
+results_table_F2_pc <- t(as.data.frame(results_F2_pc))
+print(results_table_F1_pc)
+print(results_table_F2_pc)
 
 
