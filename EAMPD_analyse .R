@@ -147,8 +147,9 @@ table_graph$instrument <- factor(table_graph$instrument, levels = colnames(monet
 
 ggplot(table_graph, aes(x = instrument, y = interest, group = date, color = date)) +
   geom_line() +
-  scale_color_manual(values = c( "2022-10-27" = "green","2022-12-15" = "red", "2023-03-16" = "blue")) +
-  labs(title = "Surprise causée par l'annonce de politique monétaire à différentes dates", x = "Maturité de l'OIS", y = "Valeur du choc") +
+  scale_color_manual(values = c( "2022-10-27" = "green","2022-12-15" = "red", "2023-03-16" = "blue"),
+                     name = "Date") +
+  labs(x = "Maturité de l'OIS", y = "Variation du taux de l'instrument") +
   theme_bw()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 
@@ -157,9 +158,14 @@ monetary_event_2020 <- monetary_event %>%
   filter(year >=2020)
 
 ggplot(monetary_event_2020, aes(x = date )) +
-  geom_line(aes(y = OIS_1M, color = ))+
+  geom_line(aes(y = OIS_1M, color = "OIS_1M"))+
+  geom_line(aes(y = OIS_1Y, color = "OIS_1Y"))+
+  geom_line(aes(y = OIS_10Y, color = "OIS_10Y"))+
+  labs(x = "Date des annonces monétaires", y = "Variation du taux des instruments") +
+  scale_color_manual(values = c(OIS_1M = "coral4", OIS_1Y = "dimgray", OIS_10Y = "greenyellow"), 
+                     labels = c("OIS_1M", "OIS_1Y", "OIS_10Y"),
+                     name = "Instrument") + 
   theme_bw()
-
 
 
 #-----------------
