@@ -17,9 +17,6 @@ library("psych")
 ```
 
 ```{r}
-
-#Loading the datasets
-
 # Chargement des bases de données
 
 press_release<- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Press Release Window") 
@@ -31,23 +28,41 @@ monetary_event<- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Monetary Event
 
 ```{r}
 # Création de variables de dates utilisables 
-monetary_event["date"]<-ymd(monetary_event$date) monetary_event["year"] <- year(monetary_event$date)
-monetary_event["month"] <-month(monetary_event$date) monetary_event["day"] <- day(monetary_event$date)
+monetary_event["date"]<-ymd(monetary_event$date) 
+monetary_event["year"] <- year(monetary_event$date)
+monetary_event["month"] <-month(monetary_event$date) 
+monetary_event["day"] <- day(monetary_event$date)
 
-# On ne garde que les valeurs à partir de 2009 (Mars 2016 ?)
+press_release["date"]<-ymd(press_release$date) 
+press_release["year"] <- year(press_release$date)
+press_release["month"] <-month(press_release$date) 
+press_release["day"] <- day(press_release$date)
 
-monetary_event_2009<- monetary_event %\>% filter(year>= 2009)
-monetary_event_2020=monetary_event%\>%filter(year>=2020)
-monetary_event_2016=monetary_event%\>%filter(year>=2016)
+press_conference["date"]<-ymd(press_conference$date) 
+press_conference["year"] <- year(press_conference$date)
+press_conference["month"] <-month(press_conference$date) 
+press_conference["day"] <- day(press_conference$date)
 
 ```
 
+```{r}
+# Bases de données 
+
+monetary_event_2009<- monetary_event %>% filter(year>= 2009)
+monetary_event_2020=monetary_event%>%filter(year>=2020)
+monetary_event_2016=monetary_event%>%filter(year>=2016)
+
+press_release_2020=press_release%>%filter(year>=2020)
+press_conference_2020=press_conference%>%filter(year>=2020)
+```
 
 
 ```{r}
 monetary_event_2009$date=format(press_conference_2009$date, "%Y-%m-%d")
+
 # Création d'un vecteur avec toutes les dates
 date=monetary_event_2009$date 
+
 monetary_event_work<-monetary_event_2009[2:15] monetary_event_work=t(monetary_event_work)
 colnames(monetary_event_work)=date
 ```
@@ -73,9 +88,7 @@ fviz_contrib(PC.pca, choice = "ind", axes = 2)
 ```
 
 ```{r}
-# Evolution temporelle des annonces de taux
-
-
+# Evolution temporelle des annonces de taux 1
 ggplot(monetary_event_2020, aes(x=date))+ 
 geom_line(aes(y = OIS_1M,color = "OIS_1M"))+ geom_line(aes(y = OIS_1Y, color = "OIS_1Y"))+
 geom_line(aes(y = OIS_10Y, color = "OIS_10Y"))+ 
@@ -84,6 +97,22 @@ scale_color_manual(values = c(OIS_1M = "coral4", OIS_1Y = "dimgray", OIS_10Y = "
 theme_bw()+ 
 ggtitle("Evolution temporelle des variations surprise des taux")
 ```
+
+```{r}
+# Evolution temporelle des annonces de taux 2
+graph_data=data.frame(press_release_2020$date,press_release_2020$OIS_1M,press_conference_2020$OIS_1M,monetary_event_2020$OIS_1M)
+colnames(graph_data)=c("date","press_release","press_conference","monetary_event")
+
+ggplot(graph_data, aes(x=date))+
+  geom_line(aes(y = press_release,color = "press_release"))+ 
+  geom_line(aes(y = press_conference, color = "press_conference"))+
+  geom_line(aes(y = monetary_event, color = "monetary_event"))+
+  scale_color_manual(values = c(press_release = "blue", press_conference = "red", monetary_event= "yellow"), labels = c("monetary_event", "press_conference", "press_release"), name= "Window")+
+  labs(x = "Date des annonces monétaires", y = "Variation du taux des OIS 1M")+
+  theme_bw()+
+  ggtitle("Evolution temporelle des variations surprise des taux dans chaque fenêtre")
+```
+
 
 ```{r}
 # Autre méthode  
