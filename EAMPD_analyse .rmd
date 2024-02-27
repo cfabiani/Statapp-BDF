@@ -145,7 +145,7 @@ head(var$coord, 4)
 loadings_matrix=var$contrib[,1:2] 
 F1=var$coord[, 1] 
 F2 <- var$coord[, 2] 
-F <- cbind(F1, F2)
+F <- cbind(date, F1, F2)
 ```
 
 ```{r}
@@ -184,12 +184,13 @@ z1_main=a*F1+b*F2
 z2_main=c*F1+d*F2
 Z_main=cbind(date,z1_main,z2_main)
 
-df_final_main=merge(monetary_event_2012, Z_main, by="date")
-df_final=merge(monetary_event_2012, Z, by="date")
 ```
 
 ```{r}
-# Vérification des corrélations entre la première dimension et chacune des deux fenêtres d'annonce
+
+df_final_main=merge(monetary_event_2012, Z_main, by="date")
+df_final=merge(monetary_event_2012, Z, by="date")
+df_final_SR=merge(monetary_event_2012, F, by="date")
 
 press_release_final=merge(press_release_2012, Z, by="date")
 press_conference_final=merge(press_conference_2012, Z, by="date")
@@ -197,8 +198,56 @@ press_conference_final=merge(press_conference_2012, Z, by="date")
 press_release_final_main=merge(press_release_2012, Z_main, by="date")
 press_conference_final_main=merge(press_conference_2012, Z_main, by="date")
 
+press_conference_SR=merge(press_conference_2012, F, by="date")
+press_release_SR=merge(press_release_2012, F, by="date")
+```
+
+```{r}
+# Vérification des corrélations entre la première dimension et chacune des deux fenêtres d'annonce
+
 vars_PR=colnames(press_release_final[2:15])
-model_PR=lm(z1 ~ vars_PR, data=press_release_final)
+vars_PC=colnames(press_conference_final[2:15])
+
+model_PR1=lm(as.formula(paste("z1 ~", paste(vars_PR, collapse = "+"))), data=press_release_final)
+summary(model_PR1)
+
+model_PR1_main=lm(as.formula(paste("z1_main ~", paste(vars_PR, collapse = "+"))), data=press_release_final_main)
+summary(model_PR1_main)
+
+```
+
+```{r}
+model_PR2=lm(as.formula(paste("z2 ~", paste(vars_PR, collapse = "+"))), data=press_release_final)
+summary(model_PR2)
+
+model_PR2_main=lm(as.formula(paste("z2_main ~", paste(vars_PR, collapse = "+"))), data=press_release_final)
+summary(model_PR2_main)
+```
+```{r}
+model_PC1=lm(as.formula(paste("z1 ~", paste(vars_PC, collapse = "+"))), data=press_conference_final)
+summary(model_PC1)
+
+model_PC1_main=lm(as.formula(paste("z1_main ~", paste(vars_PC, collapse = "+"))), data=press_conference_final_main)
+summary(model_PC1_main)
+```
+```{r}
+model_PC2=lm(as.formula(paste("z2 ~", paste(vars_PC, collapse = "+"))), data=press_conference_final)
+summary(model_PC2)
+
+model_PC2_main=lm(as.formula(paste("z2_main ~", paste(vars_PC, collapse = "+"))), data=press_conference_final)
+summary(model_PC2_main)
+```
+```{r}
+model_PR1_SR=lm(as.formula(paste("F1 ~", paste(vars_PR, collapse = "+"))), data=press_release_SR)
+summary(model_PR1_SR)
+model_PR2_SR=lm(as.formula(paste("F2 ~", paste(vars_PR, collapse = "+"))), data=press_release_SR)
+summary(model_PR2_SR)
+```
+```{r}
+model_PC1_SR=lm(as.formula(paste("F1 ~", paste(vars_PR, collapse = "+"))), data=press_conference_SR)
+summary(model_PC1_SR)
+model_PC2_SR=lm(as.formula(paste("F2 ~", paste(vars_PR, collapse = "+"))), data=press_conference_SR)
+summary(model_PC2_SR)
 ```
 
 
