@@ -1,12 +1,18 @@
 ---
-editor_options: 
-  markdown: 
-    wrap: 72
+title: "EAMPD_analyse"
+author: "Aurane Vernière"
+output: html_document
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,warning = FALSE, message = FALSE)
+```
+
 ```{r}
 library("readxl") 
 library("here") 
-install.packages(c("FactoMineR","factoextra")) library("FactoMineR") 
+install.packages(c("FactoMineR","factoextra")) 
+library("FactoMineR") 
 library("factoextra")
 library("lubridate") 
 library("dplyr") 
@@ -18,7 +24,6 @@ library("psych")
 
 ```{r}
 # Chargement des bases de données
-
 press_release<- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Press Release Window") 
 press_conference<-read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Press Conference Window") 
 monetary_event<- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Monetary Event Window")
@@ -47,48 +52,56 @@ press_conference["day"] <- day(press_conference$date)
 
 ```{r}
 # Bases de données 
-
-monetary_event_2009<- monetary_event %>% filter(year>= 2009)
+monetary_event_2012=monetary_event %>% filter(year>= 2012)
 monetary_event_2020=monetary_event%>%filter(year>=2020)
 monetary_event_2016=monetary_event%>%filter(year>=2016)
+monetary_event_2012$date=format(monetary_event_2012$date, "%Y-%m-%d")
 
 press_release_2020=press_release%>%filter(year>=2020)
+press_release_2012=press_release%>%filter(year>=2012)
+press_release_2012$date=format(press_release_2012$date, "%Y-%m-%d")
+
 press_conference_2020=press_conference%>%filter(year>=2020)
+press_conference_2012=press_conference%>%filter(year>=2012)
+press_conference_2012$date=format(press_conference_2012$date, "%Y-%m-%d")
 ```
 
 
 ```{r}
-monetary_event_2009$date=format(press_conference_2009$date, "%Y-%m-%d")
-
 # Création d'un vecteur avec toutes les dates
-date=monetary_event_2009$date 
+date=monetary_event_2012$date 
 
-monetary_event_work<-monetary_event_2009[2:15] monetary_event_work=t(monetary_event_work)
+monetary_event_work= monetary_event_2012[2:15]
+monetary_event_work=t(monetary_event_work)
 colnames(monetary_event_work)=date
 ```
 
 ```{r}
 # Réalisation de l'ACP
-PC.pca<-PCA(monetary_event_work, scale.unit = TRUE, graph = FALSE)
+PC.pca=PCA(monetary_event_work, scale.unit = TRUE, graph = FALSE)
 #print(PC.pca) 
 eig.val<- get_eigenvalue(PC.pca) 
 #print(eig.val)
 fviz_eig(PC.pca, addlabels = TRUE, ylim = c(0, 60))
-var<- get_pca_var(PC.pca) fviz_pca_var(PC.pca, col.var = "black")
+var=get_pca_var(PC.pca) 
+#fviz_pca_var(PC.pca, col.var = "black")
 
 ```
 
 ```{r}
 # Contributions des OIS à chacune des composantes de l'ACP
-
 ind=get_pca_ind(PC.pca) 
 fviz_pca_ind(PC.pca, repel=TRUE)
-fviz_contrib(PC.pca, choice = "ind", axes = 1) 
+fviz_contrib(PC.pca, choice = "ind", axes = 1)
 fviz_contrib(PC.pca, choice = "ind", axes = 2)
 ```
+Remarques : Les trois vecteurs contribuant le plus à la première dimension, censée représenter le facteur Target, sont OIS_1M, OIS_SW, OIS_3M. Il s'agit des trois vecteurs de maturité la plus courte.
+Les vecteurs contribuant le plus à la deuxième dimension, censée représenter la Forward Guidance, sont OIS_2Y, OIS_3Y, ainsi que OIS_1Y et OIS_10Y. Chose un peu étonnante à ce stade : OIS_SW contribue aussi, de manière non négligeable à cette deuxième dimension.
+
 
 ```{r}
-# Evolution temporelle des annonces de taux 1
+# Evolution temporelle des annonces de taux 1 : variations totales des taux pour différents instruments 
+
 ggplot(monetary_event_2020, aes(x=date))+ 
 geom_line(aes(y = OIS_1M,color = "OIS_1M"))+ geom_line(aes(y = OIS_1Y, color = "OIS_1Y"))+
 geom_line(aes(y = OIS_10Y, color = "OIS_10Y"))+ 
@@ -99,8 +112,13 @@ ggtitle("Evolution temporelle des variations surprise des taux")
 ```
 
 ```{r}
-# Evolution temporelle des annonces de taux 2
-graph_data=data.frame(press_release_2020$date,press_release_2020$OIS_1M,press_conference_2020$OIS_1M,monetary_event_2020$OIS_1M)
+# Evolution temporelle des annonces de taux 2 :on trace les surprises pour OIS_1M
+
+graph_data=data.frame(press_release_2020$date,
+                    press_release_2020$OIS_1M,
+                    press_conference_2020$OIS_1M,
+                    monetary_event_2020$OIS_1M)
+
 colnames(graph_data)=c("date","press_release","press_conference","monetary_event")
 
 ggplot(graph_data, aes(x=date))+
@@ -115,7 +133,8 @@ ggplot(graph_data, aes(x=date))+
 
 
 ```{r}
-# Autre méthode  
+# Autre méthode 
+
 monetary_event_work2 =scale(monetary_event_work) 
 PC.pca_2<- prcomp(monetary_event_work2)
 ```
@@ -165,9 +184,25 @@ z1_main=a*F1+b*F2
 z2_main=c*F1+d*F2
 Z_main=cbind(date,z1_main,z2_main)
 
-df_final=merge(press_conference_2009, Z_main, by="date")
-df_final2=merge(press_conference_2009, Z, by="date")
+df_final_main=merge(monetary_event_2012, Z_main, by="date")
+df_final=merge(monetary_event_2012, Z, by="date")
 ```
+
+```{r}
+# Vérification des corrélations entre la première dimension et chacune des deux fenêtres d'annonce
+
+press_release_final=merge(press_release_2012, Z, by="date")
+press_conference_final=merge(press_conference_2012, Z, by="date")
+
+press_release_final_main=merge(press_release_2012, Z_main, by="date")
+press_conference_final_main=merge(press_conference_2012, Z_main, by="date")
+
+vars_PR=colnames(press_release_final[2:15])
+model_PR=lm(z1 ~ vars_PR, data=press_release_final)
+```
+
+
+
 
 ```{r}
 # Scaling
