@@ -71,6 +71,7 @@ press_conference_2012$date=format(press_conference_2012$date, "%Y-%m-%d")
 # Création d'un vecteur avec toutes les dates
 date=monetary_event_2012$date 
 
+# Création de la base de travail
 monetary_event_work= monetary_event_2012[2:15]
 monetary_event_work=t(monetary_event_work)
 colnames(monetary_event_work)=date
@@ -125,7 +126,7 @@ ggplot(graph_data, aes(x=date))+
   geom_line(aes(y = press_release,color = "press_release"))+ 
   geom_line(aes(y = press_conference, color = "press_conference"))+
   geom_line(aes(y = monetary_event, color = "monetary_event"))+
-  scale_color_manual(values = c(press_release = "blue", press_conference = "red", monetary_event= "yellow"), labels = c("monetary_event", "press_conference", "press_release"), name= "Window")+
+  scale_color_manual(values = c(press_release = "blue3", press_conference = "red", monetary_event= "chartreuse3"), labels = c("monetary_event", "press_conference", "press_release"), name= "Window")+
   labs(x = "Date des annonces monétaires", y = "Variation du taux des OIS 1M")+
   theme_bw()+
   ggtitle("Evolution temporelle des variations surprise des taux dans chaque fenêtre")
@@ -141,7 +142,7 @@ PC.pca_2<- prcomp(monetary_event_work2)
 
 ```{r}
 # Tentative de rotation 1
-head(var$coord, 4) 
+#head(var$coord, 4) 
 loadings_matrix=var$contrib[,1:2] 
 F1=var$coord[, 1] 
 F2 <- var$coord[, 2] 
@@ -187,6 +188,7 @@ Z_main=cbind(date,z1_main,z2_main)
 ```
 
 ```{r}
+# Les différentes bases de données possibles avec les facteurs trouvés
 
 df_final_main=merge(monetary_event_2012, Z_main, by="date")
 df_final=merge(monetary_event_2012, Z, by="date")
@@ -203,6 +205,15 @@ press_release_SR=merge(press_release_2012, F, by="date")
 ```
 
 ```{r}
+# Pour arrêter de se prendre la tête avec 20 000 dataframes
+
+PR=press_release_final%>%merge(Z_main, by="date")%>%merge(F, by="date")
+MP=df_final%>%merge(Z_main, by="date")%>%merge(F, by="date")
+PC=press_conference_final%>%merge(Z_main, by="date")%>%merge(F, by="date")
+
+```
+
+```{r}
 # Vérification des corrélations entre la première dimension et chacune des deux fenêtres d'annonce
 
 vars_PR=colnames(press_release_final[2:15])
@@ -215,6 +226,7 @@ model_PR1_main=lm(as.formula(paste("z1_main ~", paste(vars_PR, collapse = "+")))
 summary(model_PR1_main)
 
 ```
+La press-release explique plus (R² plus élevé égal à 0.4 contre 0.17) le deuxième facteur que le premier dans les deux cas. 
 
 ```{r}
 model_PR2=lm(as.formula(paste("z2 ~", paste(vars_PR, collapse = "+"))), data=press_release_final)
@@ -223,6 +235,7 @@ summary(model_PR2)
 model_PR2_main=lm(as.formula(paste("z2_main ~", paste(vars_PR, collapse = "+"))), data=press_release_final)
 summary(model_PR2_main)
 ```
+
 ```{r}
 model_PC1=lm(as.formula(paste("z1 ~", paste(vars_PC, collapse = "+"))), data=press_conference_final)
 summary(model_PC1)
@@ -230,6 +243,7 @@ summary(model_PC1)
 model_PC1_main=lm(as.formula(paste("z1_main ~", paste(vars_PC, collapse = "+"))), data=press_conference_final_main)
 summary(model_PC1_main)
 ```
+
 ```{r}
 model_PC2=lm(as.formula(paste("z2 ~", paste(vars_PC, collapse = "+"))), data=press_conference_final)
 summary(model_PC2)
@@ -237,17 +251,50 @@ summary(model_PC2)
 model_PC2_main=lm(as.formula(paste("z2_main ~", paste(vars_PC, collapse = "+"))), data=press_conference_final)
 summary(model_PC2_main)
 ```
+La press conference explique mieux ici le premier facteur que le deuxième (R² de 0.55 contre 0.39).
+
 ```{r}
+# En reprenant les facteurs F1 et F2 de départ
+
 model_PR1_SR=lm(as.formula(paste("F1 ~", paste(vars_PR, collapse = "+"))), data=press_release_SR)
 summary(model_PR1_SR)
 model_PR2_SR=lm(as.formula(paste("F2 ~", paste(vars_PR, collapse = "+"))), data=press_release_SR)
 summary(model_PR2_SR)
 ```
+On retrouve le fait que la press release explique mieux le deuxième facteur que le premier. 
+
 ```{r}
 model_PC1_SR=lm(as.formula(paste("F1 ~", paste(vars_PR, collapse = "+"))), data=press_conference_SR)
 summary(model_PC1_SR)
 model_PC2_SR=lm(as.formula(paste("F2 ~", paste(vars_PR, collapse = "+"))), data=press_conference_SR)
 summary(model_PC2_SR)
+```
+La press conference explique mieux le premier facteur que le deuxième. 
+
+```{r}
+# Fonction permettant la régression de chaque OIS d'une fenêtre sur les facteurs censés être Target et FG
+
+get_regression_results_PR <- function(dependent_var, independent_var) {
+  model=lm(as.formula(paste("dependent_var ~", paste(independent_var, collapse = "+"))), data = PR)
+  coef <- coef(model)[2]
+  p_value <- summary(model)$coefficients[2, 4]
+  r_squared <- summary(model)$r.squared
+  if (p_value <= 0.01) {
+    significance <- "***"
+  } else if (p_value <= 0.05) {
+    significance <- "**"
+  } else if (p_value <= 0.10) {
+    significance <- "*"
+  } else {
+    significance <- ""
+  }
+  return(c(Coefficient = coef, `P-value` = p_value, `R-squared` = r_squared, Significance = significance))
+}
+```
+
+```{r}
+results_F1_PR <- sapply(vars_PR, function(var) get_regression_results(var, "F1"))
+results_F2_PR <- sapply(vars_PR, function(var) get_regression_results(var, "F2"))
 ```
 
 
