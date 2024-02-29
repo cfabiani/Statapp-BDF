@@ -73,28 +73,50 @@ date=monetary_event_2012$date
 
 # Création de la base de travail
 monetary_event_work= monetary_event_2012[2:15]
-monetary_event_work=t(monetary_event_work)
-colnames(monetary_event_work)=date
+#monetary_event_work=t(monetary_event_work)
+#colnames(monetary_event_work)=date
 ```
 
 ```{r}
 # Réalisation de l'ACP
-PC.pca=PCA(monetary_event_work, scale.unit = TRUE, graph = FALSE)
-#print(PC.pca) 
-eig.val<- get_eigenvalue(PC.pca) 
-#print(eig.val)
-fviz_eig(PC.pca, addlabels = TRUE, ylim = c(0, 60))
-var=get_pca_var(PC.pca) 
-#fviz_pca_var(PC.pca, col.var = "black")
-
+PC.pca=prcomp(monetary_event_work, scale=TRUE)
+fviz_eig(PC.pca, addlabels=TRUE, hjust = -0.3)+ylim(0,75)
 ```
+
+```{r}
+loadings_matrix=-1*PC.pca$rotation
+x=-1*PC.pca$x
+```
+
+
+```{r}
+fviz_pca_var(PC.pca, col.var = "steelblue")
+```
+
+```{r}
+# Eigenvalues
+eig.val <- get_eigenvalue(PC.pca)
+  
+# Results for Variables
+res.var <- get_pca_var(PC.pca)
+coord=res.var$coord          # Coordinates
+contrib=res.var$contrib        # Contributions to the PCs
+cos=res.var$cos2           # Quality of representation 
+
+# Results for individuals
+res.ind <- get_pca_ind(PC.pca)
+coord_ind=res.ind$coord          # Coordinates
+contrib_ind=res.ind$contrib        # Contributions to the PCs
+cos_ind=res.ind$cos2           # Quality of representation 
+```
+
 
 ```{r}
 # Contributions des OIS à chacune des composantes de l'ACP
 ind=get_pca_ind(PC.pca) 
 fviz_pca_ind(PC.pca, repel=TRUE)
-fviz_contrib(PC.pca, choice = "ind", axes = 1)
-fviz_contrib(PC.pca, choice = "ind", axes = 2)
+fviz_contrib(PC.pca, choice = "var", axes = 1)
+fviz_contrib(PC.pca, choice = "var", axes = 2)
 ```
 Remarques : Les trois vecteurs contribuant le plus à la première dimension, censée représenter le facteur Target, sont OIS_1M, OIS_SW, OIS_3M. Il s'agit des trois vecteurs de maturité la plus courte.
 Les vecteurs contribuant le plus à la deuxième dimension, censée représenter la Forward Guidance, sont OIS_2Y, OIS_3Y, ainsi que OIS_1Y et OIS_10Y. Chose un peu étonnante à ce stade : OIS_SW contribue aussi, de manière non négligeable à cette deuxième dimension.
@@ -112,9 +134,9 @@ theme_bw()+
 ggtitle("Evolution temporelle des variations surprise des taux")
 ```
 
+
 ```{r}
 # Evolution temporelle des annonces de taux 2 :on trace les surprises pour OIS_1M
-
 graph_data=data.frame(press_release_2020$date,
                     press_release_2020$OIS_1M,
                     press_conference_2020$OIS_1M,
@@ -134,20 +156,11 @@ ggplot(graph_data, aes(x=date))+
 
 
 ```{r}
-# Autre méthode 
-
-monetary_event_work2 =scale(monetary_event_work) 
-PC.pca_2<- prcomp(monetary_event_work2)
+F1=x[,1]
+F2=x[,2]
+F=cbind(date,F1,F2)
 ```
 
-```{r}
-# Tentative de rotation 1
-#head(var$coord, 4) 
-loadings_matrix=var$contrib[,1:2] 
-F1=var$coord[, 1] 
-F2 <- var$coord[, 2] 
-F <- cbind(date, F1, F2)
-```
 
 ```{r}
 # Tentative de rotation 2
@@ -275,7 +288,7 @@ La press conference explique mieux le premier facteur que le deuxième.
 # Fonction permettant la régression de chaque OIS d'une fenêtre sur les facteurs censés être Target et FG
 
 get_regression_results_PR <- function(dependent_var, independent_var) {
-  model=lm(as.formula(paste("dependent_var ~", paste(independent_var, collapse = "+"))), data = PR)
+  model=lm(formula(paste(dependent_var, "~", independent_var)), data = PR)
   coef <- coef(model)[2]
   p_value <- summary(model)$coefficients[2, 4]
   r_squared <- summary(model)$r.squared
@@ -293,10 +306,14 @@ get_regression_results_PR <- function(dependent_var, independent_var) {
 ```
 
 ```{r}
-results_F1_PR <- sapply(vars_PR, function(var) get_regression_results(var, "F1"))
-results_F2_PR <- sapply(vars_PR, function(var) get_regression_results(var, "F2"))
+results_F1_PR <- sapply(vars_PR, function(var) get_regression_results_PR(var, "F1"))
+results_F2_PR <- sapply(vars_PR, function(var) get_regression_results_PR(var, "F2"))
+
 ```
 
+```{r}
+PR$F1
+```
 
 
 
