@@ -18,8 +18,11 @@ library("lubridate")
 library("dplyr") 
 library("tidyverse")
 library("ggplot2") 
-install.packages("nloptr")
-library("nloptr")
+#install.packages("nloptr")
+#library("nloptr")
+library("MASS")
+install.packages("NlcOptim")
+library("NlcOptim")
 ```
 
 ```{r}
@@ -114,9 +117,6 @@ fviz_pca_ind(PC.pca, repel=TRUE)
 fviz_contrib(PC.pca, choice = "var", axes = 1)
 fviz_contrib(PC.pca, choice = "var", axes = 2)
 ```
-Remarques : Les trois vecteurs contribuant le plus à la première dimension, censée représenter le facteur Target, sont OIS_1M, OIS_SW, OIS_3M. Il s'agit des trois vecteurs de maturité la plus courte.
-Les vecteurs contribuant le plus à la deuxième dimension, censée représenter la Forward Guidance, sont OIS_2Y, OIS_3Y, ainsi que OIS_1Y et OIS_10Y. Chose un peu étonnante à ce stade : OIS_SW contribue aussi, de manière non négligeable à cette deuxième dimension.
-
 
 ```{r}
 # Evolution temporelle des annonces de taux 1 : variations totales des taux pour différents instruments 
@@ -278,8 +278,9 @@ ggplot(F_2020,aes(x=date))+
 
 scale=apply(F[,2:3], 2, sd)
 loading=loadings_matrix[,1:2]*scale
-factors=sweep(F[,2:3],2, scale, "/")
+factors=as.matrix(sweep(F[,2:3],2, scale, "/"))
 
+# Fonction des contraintes de la matrice de rotation 
 con=function(x){
     f=NULL
     #orthogonal restrictions
@@ -293,14 +294,33 @@ con=function(x){
 
  obj<-function(x){
       U=matrix(c(x[1],x[2],x[3],x[4]),nrow=2)
-      xx<-ID$Fa%*%U[,2]
+      xx<-factors%*%U[,2]
 
       out<-0.5*t(xx)%*%xx/length(xx)
       as.numeric(out)
  }
  
 sol<-solnl(c(diag(2)),objfun=obj,confun=con)
-?solnl
+```
+
+```{r}
+# On finit la rotation en appliquant la matrice de rotation à F
+
+rotate_factors<-factors%*%matrix(sol$par,nrow=2) %>%
+    as_tibble(.,.name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE))
+
+rotate_factors=rotate_factors%>%rename(F1=1, F2=2)%>% mutate(date=date) # à renommer proprement quand ce sera bien clair qui est qui (je crois que 2=Target, 1=FG)
+
+full=merge(monetary_event_2012[1:15], rotate_factors, by="date")
+```
+
+```{r}
+# Rescaling : à voir lequel à utiliser en fonction de qui est Target (je suppute que c'est F2)
+
+scale_1=coef(lm(OIS_1M~F1, data = full))[2]
+scale_2=coef(lm(OIS_1M~F2, data = full))[2]
+
+rotate_factors=rotate_factors %>%mutate(F2 = F2*scale_2)
 ```
 
 
