@@ -18,8 +18,8 @@ library("lubridate")
 library("dplyr") 
 library("tidyverse")
 library("ggplot2") 
-install.packages("psych") 
-library("psych")
+install.packages("nloptr")
+library("nloptr")
 ```
 
 ```{r}
@@ -165,7 +165,7 @@ F_2020=F%>%mutate(year=year(F$date),
 ggplot(F_2020,aes(x=date))+
   geom_line(aes(y=F1, color="First_Dimension"))+
   geom_line(aes(y=F2, color="Second_Dimension"))+
-  scale_color_manual(values=c(First_Dimension="cadetblue4", Second_Dimension="brown4"), labels=c("Dimension 1","Dimension 2"))+
+  scale_color_manual(values=c(First_Dimension="cadetblue4", Second_Dimension="brown4"), labels=c("Dimension 1","Dimension 2"), name="Légende")+
   labs(x="Dates des annonces monétaires", y="Componsantes de l'annonce")+
   theme_bw()+
   ggtitle("Evolution temporelle des deux composantes de l'annonce \nmonétaire trouvées via l'ACP")
@@ -237,6 +237,70 @@ results_table_F2_PC <- t(as.data.frame(results_F2_PC))
 
 print(results_table_F1_PC)
 print(results_table_F2_PC)
+```
+
+```{r}
+ggplot(F_2020,aes(x=date))+
+  geom_line(aes(y=OIS_SW, color="OIS_SW"))+
+  geom_line(aes(y=OIS_1M, color="OIS_1M"))+
+  geom_line(aes(y=F2, color="Second_Dimension"))+
+  scale_color_manual(values=c(OIS_SW="cadetblue4", OIS_1M="brown4",Second_Dimension="goldenrod3"), labels=c("OIS SW","OIS 1M","Dimension 2"), name="Légende")+
+  labs(x="Dates des annonces monétaires")+
+  theme_bw()+
+  ggtitle("Evolution temporelle de la deuxième composante de l'ACP et \ndes surprises des OIS SW et 1M")
+```
+
+```{r}
+ggplot(F_2020,aes(x=date))+
+  geom_line(aes(y=OIS_1Y, color="OIS_1Y"))+
+  geom_line(aes(y=OIS_5Y, color="OIS_5Y"))+
+  geom_line(aes(y=F2, color="Second_Dimension"))+
+  scale_color_manual(values=c(OIS_1Y="cadetblue4", OIS_5Y="brown4",Second_Dimension="goldenrod3"), labels=c("OIS 1Y","OIS 5Y","Dimension 2"), name="Légende")+
+  labs(x="Dates des annonces monétaires")+
+  theme_bw()+
+  ggtitle("Evolution temporelle de la deuxième composante de l'ACP et \ndes surprises des OIS 1Y et 5Y")
+```
+
+```{r}
+ggplot(F_2020,aes(x=date))+
+  geom_line(aes(y=OIS_1M, color="OIS_1M"))+
+  geom_line(aes(y=OIS_1Y, color="OIS_1Y"))+
+  geom_line(aes(y=OIS_5Y, color="OIS_5Y"))+
+  geom_line(aes(y=F1, color="First_Dimension"))+
+  scale_color_manual(values=c(OIS_1M="darkgoldenrod1", OIS_1Y="darkorange1", OIS_5Y="brown4",First_Dimension="cadetblue4"), labels=c("Dimension 1","OIS 1M","OIS 1Y", "OIS 5Y"), name="Légende")+
+  labs(x="Dates des annonces monétaires")+
+  theme_bw()+
+  ggtitle("Evolution temporelle de la première composante de l'ACP et \ndes surprises des OIS 1M, 1Y et 5Y")
+```
+
+```{r}
+# Fonction de rotation des facteurs (on s'inspire du github de Martin Baumgaertner)
+
+scale=apply(F[,2:3], 2, sd)
+loading=loadings_matrix[,1:2]*scale
+factors=sweep(F[,2:3],2, scale, "/")
+
+con=function(x){
+    f=NULL
+    #orthogonal restrictions
+    f=rbind(f,x[1]^2 + x[3]^2 - 1) 
+    f=rbind(f,x[2]^2 + x[4]^2 - 1)
+    f=rbind(f,x[1]*x[2] + x[3]*x[4] - 0)
+    #second and third factors does not load on one month rate
+    f=rbind(f,x[2]*loading[2,1] + x[4]*loading[2,2] -0)
+    return(list(ceq=f,c=NULL))
+}
+
+ obj<-function(x){
+      U=matrix(c(x[1],x[2],x[3],x[4]),nrow=2)
+      xx<-ID$Fa%*%U[,2]
+
+      out<-0.5*t(xx)%*%xx/length(xx)
+      as.numeric(out)
+ }
+ 
+sol<-solnl(c(diag(2)),objfun=obj,confun=con)
+?solnl
 ```
 
 
