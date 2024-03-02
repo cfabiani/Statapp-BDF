@@ -30,7 +30,6 @@ monetary_event<- read_excel(here("Dataset_EA-MPD.xlsx"), sheet = "Monetary Event
 
 ```
 
-
 ```{r}
 # Création de variables de dates utilisables 
 monetary_event["date"]<-ymd(monetary_event$date) 
@@ -47,7 +46,6 @@ press_conference["date"]<-ymd(press_conference$date)
 press_conference["year"] <- year(press_conference$date)
 press_conference["month"] <-month(press_conference$date) 
 press_conference["day"] <- day(press_conference$date)
-
 ```
 
 ```{r}
@@ -55,21 +53,21 @@ press_conference["day"] <- day(press_conference$date)
 monetary_event_2012=monetary_event %>% filter(year>= 2012)
 monetary_event_2020=monetary_event%>%filter(year>=2020)
 monetary_event_2016=monetary_event%>%filter(year>=2016)
-monetary_event_2012$date=format(monetary_event_2012$date, "%Y-%m-%d")
+date=monetary_event_2012$date
+#monetary_event_2012$date=format(monetary_event_2012$date, "%Y-%m-%d")
 
 press_release_2020=press_release%>%filter(year>=2020)
 press_release_2012=press_release%>%filter(year>=2012)
-press_release_2012$date=format(press_release_2012$date, "%Y-%m-%d")
+#press_release_2012$date=format(press_release_2012$date, "%Y-%m-%d")
 
 press_conference_2020=press_conference%>%filter(year>=2020)
 press_conference_2012=press_conference%>%filter(year>=2012)
-press_conference_2012$date=format(press_conference_2012$date, "%Y-%m-%d")
+#press_conference_2012$date=format(press_conference_2012$date, "%Y-%m-%d")
 ```
-
 
 ```{r}
 # Création d'un vecteur avec toutes les dates
-date=monetary_event_2012$date 
+#date=monetary_event_2012$date 
 
 # Création de la base de travail
 monetary_event_work= monetary_event_2012[2:15]
@@ -87,7 +85,6 @@ fviz_eig(PC.pca, addlabels=TRUE, hjust = -0.3)+ylim(0,75)
 loadings_matrix=-1*PC.pca$rotation
 x=-1*PC.pca$x
 ```
-
 
 ```{r}
 fviz_pca_var(PC.pca, col.var = "steelblue")
@@ -109,7 +106,6 @@ coord_ind=res.ind$coord          # Coordinates
 contrib_ind=res.ind$contrib        # Contributions to the PCs
 cos_ind=res.ind$cos2           # Quality of representation 
 ```
-
 
 ```{r}
 # Contributions des OIS à chacune des composantes de l'ACP
@@ -134,7 +130,6 @@ theme_bw()+
 ggtitle("Evolution temporelle des variations surprise des taux")
 ```
 
-
 ```{r}
 # Evolution temporelle des annonces de taux 2 :on trace les surprises pour OIS_1M
 graph_data=data.frame(press_release_2020$date,
@@ -148,17 +143,100 @@ ggplot(graph_data, aes(x=date))+
   geom_line(aes(y = press_release,color = "press_release"))+ 
   geom_line(aes(y = press_conference, color = "press_conference"))+
   geom_line(aes(y = monetary_event, color = "monetary_event"))+
-  scale_color_manual(values = c(press_release = "blue3", press_conference = "red", monetary_event= "chartreuse3"), labels = c("monetary_event", "press_conference", "press_release"), name= "Window")+
+  scale_color_manual(values = c(press_release = "blue3", press_conference = "red", monetary_event= "chartreuse3"), labels = c("monetary event", "press conference", "press release"), name= "Window")+
   labs(x = "Date des annonces monétaires", y = "Variation du taux des OIS 1M")+
   theme_bw()+
-  ggtitle("Evolution temporelle des variations surprise des taux dans chaque fenêtre")
+  ggtitle("Evolution temporelle des variations surprise des taux \ndans chaque fenêtre")
 ```
-
 
 ```{r}
 F1=x[,1]
 F2=x[,2]
-F=cbind(date,F1,F2)
+F=data.frame(date,F1,F2)
+```
+
+```{r}
+F_2020=F%>%mutate(year=year(F$date), 
+                  OIS_SW=monetary_event_2012$OIS_SW,
+                  OIS_1M=monetary_event_2012$OIS_1M,
+                  OIS_1Y=monetary_event_2012$OIS_1Y,
+                  OIS_5Y=monetary_event_2012$OIS_5Y)%>%filter(year>=2020)
+
+ggplot(F_2020,aes(x=date))+
+  geom_line(aes(y=F1, color="First_Dimension"))+
+  geom_line(aes(y=F2, color="Second_Dimension"))+
+  scale_color_manual(values=c(First_Dimension="cadetblue4", Second_Dimension="brown4"), labels=c("Dimension 1","Dimension 2"))+
+  labs(x="Dates des annonces monétaires", y="Componsantes de l'annonce")+
+  theme_bw()+
+  ggtitle("Evolution temporelle des deux composantes de l'annonce \nmonétaire trouvées via l'ACP")
+```
+
+```{r}
+monetary_event_SR=merge(monetary_event_2012, F, by="date")
+press_conference_SR=merge(press_conference_2012, F, by="date")
+press_release_SR=merge(press_release_2012, F, by="date")
+
+vars_PR=colnames(press_release_SR[2:15])
+vars_PC=colnames(press_conference_SR[2:15])
+```
+
+```{r}
+# Vérification des corrélations : Press_release
+
+model_PR1_SR=lm(as.formula(paste("F1 ~", paste(vars_PR, collapse = "+"))), data=press_release_SR)
+summary(model_PR1_SR)
+model_PR2_SR=lm(as.formula(paste("F2 ~", paste(vars_PR, collapse = "+"))), data=press_release_SR)
+summary(model_PR2_SR)
+```
+
+```{r}
+# Vérification des corrélations : Press_conference
+
+model_PC1_SR=lm(as.formula(paste("F1 ~", paste(vars_PR, collapse = "+"))), data=press_conference_SR)
+summary(model_PC1_SR)
+model_PC2_SR=lm(as.formula(paste("F2 ~", paste(vars_PR, collapse = "+"))), data=press_conference_SR)
+summary(model_PC2_SR)
+```
+
+```{r}
+# Fonction permettant la régression de chaque OIS d'une fenêtre sur les facteurs censés être Target et FG
+
+get_regression_results <- function(df, dependent_var, independent_var) {
+  model=lm(formula(paste(dependent_var, "~", independent_var)), data = df)
+  coef <- round(coef(model)[2],3)
+  p_value <- round(summary(model)$coefficients[2, 4],3)
+  r_squared <- round(summary(model)$r.squared, 3)
+  if (p_value <= 0.01) {
+    significance <- "***"
+  } else if (p_value <= 0.05) {
+    significance <- "**"
+  } else if (p_value <= 0.10) {
+    significance <- "*"
+  } else {
+    significance <- ""
+  }
+  return(c(Coefficient = coef, `P-value` = p_value, `R-squared` = r_squared, Significance = significance))
+}
+```
+
+```{r}
+results_F1_PR <- sapply(vars_PR, function(var) get_regression_results(press_release_SR, var, "F1"))
+results_F2_PR <- sapply(vars_PR, function(var) get_regression_results(press_release_SR, var, "F2"))
+results_table_F1_PR <- t(as.data.frame(results_F1_PR))
+results_table_F2_PR <- t(as.data.frame(results_F2_PR))
+
+print(results_table_F1_PR)
+print(results_table_F2_PR)
+```
+
+```{r}
+results_F1_PC <- sapply(vars_PR, function(var) get_regression_results(press_conference_SR, var, "F1"))
+results_F2_PC <- sapply(vars_PR, function(var) get_regression_results(press_conference_SR, var, "F2"))
+results_table_F1_PC <- t(as.data.frame(results_F1_PC))
+results_table_F2_PC <- t(as.data.frame(results_F2_PC))
+
+print(results_table_F1_PC)
+print(results_table_F2_PC)
 ```
 
 
@@ -202,10 +280,8 @@ Z_main=cbind(date,z1_main,z2_main)
 
 ```{r}
 # Les différentes bases de données possibles avec les facteurs trouvés
-
 df_final_main=merge(monetary_event_2012, Z_main, by="date")
 df_final=merge(monetary_event_2012, Z, by="date")
-df_final_SR=merge(monetary_event_2012, F, by="date")
 
 press_release_final=merge(press_release_2012, Z, by="date")
 press_conference_final=merge(press_conference_2012, Z, by="date")
@@ -213,13 +289,10 @@ press_conference_final=merge(press_conference_2012, Z, by="date")
 press_release_final_main=merge(press_release_2012, Z_main, by="date")
 press_conference_final_main=merge(press_conference_2012, Z_main, by="date")
 
-press_conference_SR=merge(press_conference_2012, F, by="date")
-press_release_SR=merge(press_release_2012, F, by="date")
 ```
 
 ```{r}
 # Pour arrêter de se prendre la tête avec 20 000 dataframes
-
 PR=press_release_final%>%merge(Z_main, by="date")%>%merge(F, by="date")
 MP=df_final%>%merge(Z_main, by="date")%>%merge(F, by="date")
 PC=press_conference_final%>%merge(Z_main, by="date")%>%merge(F, by="date")
@@ -228,9 +301,6 @@ PC=press_conference_final%>%merge(Z_main, by="date")%>%merge(F, by="date")
 
 ```{r}
 # Vérification des corrélations entre la première dimension et chacune des deux fenêtres d'annonce
-
-vars_PR=colnames(press_release_final[2:15])
-vars_PC=colnames(press_conference_final[2:15])
 
 model_PR1=lm(as.formula(paste("z1 ~", paste(vars_PR, collapse = "+"))), data=press_release_final)
 summary(model_PR1)
@@ -266,50 +336,6 @@ summary(model_PC2_main)
 ```
 La press conference explique mieux ici le premier facteur que le deuxième (R² de 0.55 contre 0.39).
 
-```{r}
-# En reprenant les facteurs F1 et F2 de départ
-
-model_PR1_SR=lm(as.formula(paste("F1 ~", paste(vars_PR, collapse = "+"))), data=press_release_SR)
-summary(model_PR1_SR)
-model_PR2_SR=lm(as.formula(paste("F2 ~", paste(vars_PR, collapse = "+"))), data=press_release_SR)
-summary(model_PR2_SR)
-```
-On retrouve le fait que la press release explique mieux le deuxième facteur que le premier. 
-
-```{r}
-model_PC1_SR=lm(as.formula(paste("F1 ~", paste(vars_PR, collapse = "+"))), data=press_conference_SR)
-summary(model_PC1_SR)
-model_PC2_SR=lm(as.formula(paste("F2 ~", paste(vars_PR, collapse = "+"))), data=press_conference_SR)
-summary(model_PC2_SR)
-```
-La press conference explique mieux le premier facteur que le deuxième. 
-
-```{r}
-# Fonction permettant la régression de chaque OIS d'une fenêtre sur les facteurs censés être Target et FG
-
-get_regression_results_PR <- function(dependent_var, independent_var) {
-  model=lm(formula(paste(dependent_var, "~", independent_var)), data = PR)
-  coef <- coef(model)[2]
-  p_value <- summary(model)$coefficients[2, 4]
-  r_squared <- summary(model)$r.squared
-  if (p_value <= 0.01) {
-    significance <- "***"
-  } else if (p_value <= 0.05) {
-    significance <- "**"
-  } else if (p_value <= 0.10) {
-    significance <- "*"
-  } else {
-    significance <- ""
-  }
-  return(c(Coefficient = coef, `P-value` = p_value, `R-squared` = r_squared, Significance = significance))
-}
-```
-
-```{r}
-results_F1_PR <- sapply(vars_PR, function(var) get_regression_results_PR(var, "F1"))
-results_F2_PR <- sapply(vars_PR, function(var) get_regression_results_PR(var, "F2"))
-
-```
 
 ```{r}
 PR$F1
