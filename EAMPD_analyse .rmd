@@ -288,7 +288,8 @@ con=function(x){
     f=rbind(f,x[2]^2 + x[4]^2 - 1)
     f=rbind(f,x[1]*x[2] + x[3]*x[4] - 0)
     #second and third factors does not load on one month rate
-    f=rbind(f,x[2]*loading[2,1] + x[4]*loading[2,2] -0)
+    f=rbind(f,x[2]*loading[2,1] + x[4]*loading[2,2] -0) 
+    # ici il met plutôt "rbind(f,x[3]*loading[1,1] + x[4]*loading[1,2] -0)", mais je crois qu'il se plante dans les indices de x ...
     return(list(ceq=f,c=NULL))
 }
 
@@ -322,6 +323,24 @@ scale_2=coef(lm(OIS_1M~F2, data = full))[2]
 
 rotate_factors=rotate_factors %>%mutate(F2 = F2*scale_2)
 ```
+
+```{r}
+# Evolution des rotate_factors
+rotate_factors_2020=rotate_factors%>%mutate(year=year(rotate_factors$date), 
+                  OIS_SW=monetary_event_2012$OIS_SW,
+                  OIS_1M=monetary_event_2012$OIS_1M,
+                  OIS_1Y=monetary_event_2012$OIS_1Y,
+                  OIS_5Y=monetary_event_2012$OIS_5Y)%>%filter(year>=2020)
+
+ggplot(rotate_factors_2020,aes(x=date))+
+  geom_line(aes(y=F1, color="First_Dimension"))+
+  geom_line(aes(y=F2, color="Second_Dimension"))+
+  scale_color_manual(values=c(First_Dimension="cadetblue4", Second_Dimension="brown4"), labels=c("Dimension 1","Dimension 2"), name="Légende")+
+  labs(x="Dates des annonces monétaires", y="Componsantes de l'annonce")+
+  theme_bw()+
+  ggtitle("Evolution temporelle des deux composantes de l'annonce \nmonétaire après rotation")
+```
+
 
 
 ```{r}
