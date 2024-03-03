@@ -78,6 +78,8 @@ monetary_event_work= monetary_event_2012[2:15]
 #colnames(monetary_event_work)=date
 ```
 
+## ACP et première analyse
+
 ```{r}
 # Réalisation de l'ACP
 PC.pca=prcomp(monetary_event_work, scale=TRUE)
@@ -276,6 +278,8 @@ ggplot(F_2020,aes(x=date))+
 
 Observations : j'ai l'impression que la première dimension réagit "à retardement" (ou en avance en fait selon le point de vue) par rapport à l'évolution de l'OIS 5Y.
 
+## Rotation
+
 ```{r}
 # Fonction de rotation des facteurs (on s'inspire du github de Martin Baumgaertner) 
 # ATTENTION : il faut intervertir, j'ai mis en commentaire le code d'origine à chaque fois quand je pense que ça change et je propose ce que ça donne avec nos coeffs.
@@ -382,9 +386,26 @@ On a un peu augmenté le R² pour les surprises des OIS de maturités longues da
 
 PROBLEME (?) : la première composante est quand même assez mystérieuse...
 
+## Règle de Taylor
 
+```{r}
+HICP = read.csv(here("ECB Data Portal_HICP_overall_index.csv"))
+HICP_work=as.data.frame(t(apply(HICP, 1, function(x) unlist(strsplit(as.character(x), ',')))))
+HICP_work=HICP_work%>%
+  rename(date = V1, date2=V2, HICP = V3)%>%
+  dplyr::select(date, HICP)%>%
+  mutate(date = gsub("\"", "", date), HICP = gsub("\"", "", HICP)
+  )
 
+HICP_work["date"]<-ymd(HICP_work$date)
+HICP_work["year"] <- year(HICP_work$date)
+HICP_work["month"] <-month(HICP_work$date) 
+HICP_work["day"] <- day(HICP_work$date)
+```
 
+```{r}
+HICP_2012=HICP_work%>%filter(year>=2012)
+```
 
 
 
