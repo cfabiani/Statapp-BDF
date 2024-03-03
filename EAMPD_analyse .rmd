@@ -238,6 +238,7 @@ results_table_F2_PC <- t(as.data.frame(results_F2_PC))
 print(results_table_F1_PC)
 print(results_table_F2_PC)
 ```
+Lors de la Press Conference, aucun des OIS n'est expliqué par le deuxième vecteur de l'analyse en composantes principales. En effet, les R² sont tous faibles. On suppose donc que la deuxième composante correspond au Target. Cette supposition est aussi appuyée par le fait que les surprises associées aux OIS de maturités courtes lors de la Press Release sont positivement corrélées à ce deuxième facteur et que les R² associés sont très élevés. 
 
 ```{r}
 ggplot(F_2020,aes(x=date))+
@@ -255,7 +256,7 @@ ggplot(F_2020,aes(x=date))+
   geom_line(aes(y=OIS_1Y, color="OIS_1Y"))+
   geom_line(aes(y=OIS_5Y, color="OIS_5Y"))+
   geom_line(aes(y=F2, color="Second_Dimension"))+
-  scale_color_manual(values=c(OIS_1Y="cadetblue4", OIS_5Y="brown4",Second_Dimension="goldenrod3"), labels=c("OIS 1Y","OIS 5Y","Dimension 2"), name="Légende")+
+  scale_color_manual(values=c(OIS_1Y="cadetblue4", OIS_5Y="brown4", Second_Dimension="goldenrod3"), labels=c("OIS 1Y","OIS 5Y","Dimension 2"), name="Légende")+
   labs(x="Dates des annonces monétaires")+
   theme_bw()+
   ggtitle("Evolution temporelle de la deuxième composante de l'ACP et \ndes surprises des OIS 1Y et 5Y")
@@ -267,18 +268,25 @@ ggplot(F_2020,aes(x=date))+
   geom_line(aes(y=OIS_1Y, color="OIS_1Y"))+
   geom_line(aes(y=OIS_5Y, color="OIS_5Y"))+
   geom_line(aes(y=F1, color="First_Dimension"))+
-  scale_color_manual(values=c(OIS_1M="darkgoldenrod1", OIS_1Y="darkorange1", OIS_5Y="brown4",First_Dimension="cadetblue4"), labels=c("Dimension 1","OIS 1M","OIS 1Y", "OIS 5Y"), name="Légende")+
+  scale_color_manual(values=c(OIS_1M="darkgoldenrod1", OIS_1Y="darkorange1", OIS_5Y="brown4", First_Dimension="cadetblue4"), labels=c("Dimension 1","OIS 1M","OIS 1Y", "OIS 5Y"), name="Légende")+
   labs(x="Dates des annonces monétaires")+
   theme_bw()+
   ggtitle("Evolution temporelle de la première composante de l'ACP et \ndes surprises des OIS 1M, 1Y et 5Y")
 ```
 
-```{r}
-# Fonction de rotation des facteurs (on s'inspire du github de Martin Baumgaertner)
+Observations : j'ai l'impression que la première dimension réagit "à retardement" (ou en avance en fait selon le point de vue) par rapport à l'évolution de l'OIS 5Y.
 
-scale=apply(F[,2:3], 2, sd)
-loading=loadings_matrix[,1:2]*scale
-factors=as.matrix(sweep(F[,2:3],2, scale, "/"))
+```{r}
+# Fonction de rotation des facteurs (on s'inspire du github de Martin Baumgaertner) 
+# ATTENTION : il faut intervertir, j'ai mis en commentaire le code d'origine à chaque fois quand je pense que ça change et je propose ce que ça donne avec nos coeffs.
+
+scale=apply(F[c("F2","F1")], 2, sd) 
+# scale=apply(F[,2:3], 2, sd)
+res=cbind(loadings_matrix[,2], loadings_matrix[,1])
+loading=res*scale 
+# loading=loadings_matrix[,1:2]*scale
+factors=as.matrix(sweep(F[c("F2","F1")], 2, scale, "/"))
+# factors=as.matrix(sweep(F[,2:3],2, scale, "/"))
 
 # Fonction des contraintes de la matrice de rotation 
 con=function(x){
@@ -302,6 +310,7 @@ con=function(x){
  }
  
 sol<-solnl(c(diag(2)),objfun=obj,confun=con)
+sol$par
 ```
 
 ```{r}
@@ -310,7 +319,7 @@ sol<-solnl(c(diag(2)),objfun=obj,confun=con)
 rotate_factors<-factors%*%matrix(sol$par,nrow=2) %>%
     as_tibble(.,.name_repair = ~ vctrs::vec_as_names(..., repair = "unique", quiet = TRUE))
 
-rotate_factors=rotate_factors%>%rename(F1=1, F2=2)%>% mutate(date=date) # à renommer proprement quand ce sera bien clair qui est qui (je crois que 2=Target, 1=FG)
+rotate_factors=rotate_factors%>%rename(F2=1, F1=2)%>% mutate(date=date) # à renommer proprement quand ce sera bien clair qui est qui (je crois que 2=Target, 1=FG)
 
 full=merge(monetary_event_2012[1:15], rotate_factors, by="date")
 ```
@@ -340,7 +349,6 @@ ggplot(rotate_factors_2020,aes(x=date))+
   theme_bw()+
   ggtitle("Evolution temporelle des deux composantes de l'annonce \nmonétaire après rotation")
 ```
-
 
 
 ```{r}
