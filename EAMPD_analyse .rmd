@@ -331,6 +331,7 @@ scale_1=coef(lm(OIS_1M~F1, data = full))[2]
 scale_2=coef(lm(OIS_1M~F2, data = full))[2]
 
 rotate_factors=rotate_factors %>%mutate(F2 = F2*scale_2)
+
 ```
 
 ```{r}
@@ -349,6 +350,47 @@ ggplot(rotate_factors_2020,aes(x=date))+
   theme_bw()+
   ggtitle("Evolution temporelle des deux composantes de l'annonce \nmonétaire après rotation")
 ```
+
+```{r}
+monetary_event_R=merge(monetary_event_2012, rotate_factors, by="date")
+press_conference_R=merge(press_conference_2012, rotate_factors, by="date")
+press_release_R=merge(press_release_2012, rotate_factors, by="date")
+```
+
+
+```{r}
+results_F1_PR_R <- sapply(vars_PR, function(var) get_regression_results(press_release_R, var, "F1"))
+results_F2_PR_R <- sapply(vars_PR, function(var) get_regression_results(press_release_R, var, "F2"))
+results_table_F1_PR_R <- t(as.data.frame(results_F1_PR_R))
+results_table_F2_PR_R <- t(as.data.frame(results_F2_PR_R))
+
+print(results_table_F1_PR_R)
+print(results_table_F2_PR_R)
+```
+On a bien F2 parfaitement aligné avec les OIS 1M. En revanche, les R² ont légèrement baissé.
+
+```{r}
+results_F1_PC_R <- sapply(vars_PC, function(var) get_regression_results(press_conference_R, var, "F1"))
+results_F2_PC_R <- sapply(vars_PC, function(var) get_regression_results(press_conference_R, var, "F2"))
+results_table_F1_PC_R <- t(as.data.frame(results_F1_PC_R))
+results_table_F2_PC_R <- t(as.data.frame(results_F2_PC_R))
+
+print(results_table_F1_PC_R)
+print(results_table_F2_PC_R)
+```
+On a un peu augmenté le R² pour les surprises des OIS de maturités longues dans la régression sur la deuxième composante.
+
+PROBLEME (?) : la première composante est quand même assez mystérieuse...
+
+
+
+
+
+
+
+
+
+
 
 
 ```{r}
