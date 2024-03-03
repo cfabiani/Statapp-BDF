@@ -389,6 +389,8 @@ PROBLEME (?) : la première composante est quand même assez mystérieuse...
 ## Règle de Taylor
 
 ```{r}
+# Données d'inflation 1996-2024 (Eurostats)
+
 HICP = read.csv(here("ECB Data Portal_HICP_overall_index.csv"))
 HICP_work=as.data.frame(t(apply(HICP, 1, function(x) unlist(strsplit(as.character(x), ',')))))
 HICP_work=HICP_work%>%
@@ -407,6 +409,10 @@ HICP_work["day"] <- day(HICP_work$date)
 HICP_2012=HICP_work%>%filter(year>=2012)
 ```
 
+```{r}
+# Données de prévision d'inflation (OCDE)
+Forecast=read_excel(here("OECD-DP_LIVE-EA17_CPIFORECAST_TOT.xlsx"))
+```
 
 
 
