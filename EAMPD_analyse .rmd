@@ -17,12 +17,11 @@ library("factoextra")
 library("lubridate") 
 library("dplyr") 
 library("tidyverse")
-library("ggplot2") 
-#install.packages("nloptr")
-#library("nloptr")
+library("ggplot2")  
 library("MASS")
 install.packages("NlcOptim")
 library("NlcOptim")
+library(tidyr)
 ```
 
 ```{r}
@@ -403,6 +402,9 @@ HICP_work["date"]<-ymd(HICP_work$date)
 HICP_work["year"] <- year(HICP_work$date)
 HICP_work["month"] <-month(HICP_work$date) 
 HICP_work["day"] <- day(HICP_work$date)
+HICP_work=HICP_work%>%mutate(trimester = cut(month, breaks = c(0, 3, 6, 9, 12), labels = c("1", "2", "3", "4"), include.lowest = TRUE))
+
+HICP_work$HICP=as.numeric(HICP_work$HICP)
 ```
 
 ```{r}
@@ -412,8 +414,14 @@ HICP_2012=HICP_work%>%filter(year>=2012)
 ```{r}
 # Données de prévision d'inflation (OCDE)
 Forecast=read_excel(here("OECD-DP_LIVE-EA17_CPIFORECAST_TOT.xlsx"))
+Forecast=separate(Forecast, period, into=c("year","trimester"),sep="-Q")
 ```
 
+```{r}
+# Evolution de l'IPCH
+ggplot(HICP_2012,aes(x=date, y=HICP))+geom_line()
+
+```
 
 
 
