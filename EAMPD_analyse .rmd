@@ -415,6 +415,7 @@ HICP_2012=HICP_work%>%filter(year>=2012)
 # Données de prévision d'inflation (OCDE)
 Forecast=read_excel(here("OECD-DP_LIVE-EA17_CPIFORECAST_TOT.xlsx"))
 Forecast=separate(Forecast, period, into=c("year","trimester"),sep="-Q")
+Forecast_2012=Forecast%>%filter(year>=2011)
 ```
 
 ```{r}
@@ -422,6 +423,66 @@ Forecast=separate(Forecast, period, into=c("year","trimester"),sep="-Q")
 ggplot(HICP_2012,aes(x=date, y=HICP))+geom_line()
 
 ```
+
+```{r}
+# Création d'un dataset avec les facteurs Target et FG et les données macro
+rotate_factors["date"]<-ymd(rotate_factors$date)
+rotate_factors["year"] <- year(rotate_factors$date)
+rotate_factors["month"] <-month(rotate_factors$date) 
+rotate_factors["day"] <- day(rotate_factors$date)
+rotate_factors=rotate_factors%>%mutate(trimester = cut(month, breaks = c(0, 3, 6, 9, 12), labels = c("1", "2", "3", "4"), include.lowest = TRUE))
+
+```
+
+```{r}
+find_nearest_inflation=function(df,date){
+  nearest_date=max(df$date[df$date<=date])
+  nearest_indice=which(df$date==nearest_date)
+  inflation=df$HICP[nearest_indice]
+  return(inflation)
+}
+test=sapply(rotate_factors$date, find_nearest_inflation, df=HICP_2012)
+test=unlist(c(NA,test))
+rotate_factors$HICP=test
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
