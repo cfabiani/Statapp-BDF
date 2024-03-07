@@ -415,6 +415,7 @@ HICP_2012=HICP_work%>%filter(year>=2012)
 # Données de prévision d'inflation (OCDE)
 Forecast=read_excel(here("OECD-DP_LIVE-EA17_CPIFORECAST_TOT.xlsx"))
 Forecast=separate(Forecast, period, into=c("year","trimester"),sep="-Q")
+Forecast=Forecast%>%rename(HICP_forecast=`Euro area (17 countries) – Inflation forecast – Total – Annual growth rate (%) – Quarterly (OECD/DP_LIVE/EA17.CPIFORECAST.TOT.AGRWTH.Q)`)
 Forecast_2012=Forecast%>%filter(year>=2011)
 ```
 
@@ -444,7 +445,36 @@ find_nearest_inflation=function(df,date){
 test=sapply(rotate_factors$date, find_nearest_inflation, df=HICP_2012)
 test=unlist(c(NA,test))
 rotate_factors$HICP=test
+rotate_factors=rotate_factors%>%drop_na(HICP)
+```
 
+```{r}
+# Régressions de chacun des deux facteurs sur l'inflation
+model_HICP2=lm(F2~HICP, data=rotate_factors)
+model_HICP1=lm(F1~HICP, data=rotate_factors)
+
+summary(model_HICP2)
+summary(model_HICP1)
+```
+```{r}
+find_nearest_forecast=function(df, date){
+  month=month(date)
+  year=year(date)
+  quarter=as.numeric(cut(month, breaks = c(0, 3, 6, 9, 12), labels = c(1, 2, 3, 4), include.lowest = TRUE))
+  # On choisit d'associer à la date de l'annonce la prédiction du prochain trimestre
+  if(quarter %in% c(1,2,3)){
+    nearest_quarter_indice=which(quarter+1==df$trimester[df$year==year])}
+  if(quarter==4){
+    nearest_quarter_indice=which(1==df$trimester[df$year==year+1])
+  }
+  forecast=df$HICP_forecast[nearest_quarter_indice]
+  return(forecast)
+}
+
+test2=sapply(rotate_factors$date, find_nearest_forecast, df=Forecast_2012)
+test2 
+# Vérifier que ça marche (demain) quand on fusionne avec rotate_factors
+rotate_factors$HICP_forecast=test2
 ```
 
 
