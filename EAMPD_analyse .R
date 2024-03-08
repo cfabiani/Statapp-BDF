@@ -226,7 +226,7 @@ get_regression_results_pc <- function(dependent_var, independent_var) {
   } else {
     significance <- ""
   }
-  #return(c(Coefficient = coef, `P-value` = p_value, `R-squared` = r_squared, Significance = significance))
+  return(c(Coefficient = coef, `P-value` = p_value, `R-squared` = r_squared, Significance = significance))
 }
 
 results_F1_pc <- sapply(vars_pc, function(var) get_regression_results_pc(var, "F1"))
@@ -235,5 +235,8 @@ results_table_F1_pc <- t(as.data.frame(results_F1_pc))
 results_table_F2_pc <- t(as.data.frame(results_F2_pc))
 print(results_table_F1_pc)
 print(results_table_F2_pc)
+library(xtable)
+latex_table <- xtable(results_table_F2_pc)
+print(latex_table, include.rownames = FALSE)
 
 
