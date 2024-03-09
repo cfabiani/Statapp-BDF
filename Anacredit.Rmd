@@ -1,0 +1,303 @@
+---
+title: "Anacredit"
+author: "Aurane Vernière"
+date: "2024-03-08"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("readxl")
+library("here")
+library("FactoMineR")
+library("factoextra")
+library("lubridate")
+library("dplyr")
+library("tidyverse")
+library("readr")
+library("psych")
+library("magrittr")
+```
+
+```{r}
+# Ouverture de la base 
+anacredit=read_csv("D:/final_df_anonymous.csv")
+```
+
+```{r}
+# Mise en format des Inception date
+anacredit <- anacredit %>%
+  mutate(DT_INCPTN = as.Date(as.character(DT_INCPTN), format = "%Y%m%d"))
+```
+
+```{r}
+#-----Première représentation des taux par jour-----
+rate_by_day <- anacredit %>%
+  group_by(DT_INCPTN) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+
+ggplot(data = rate_by_day,  aes(x = DT_INCPTN, y = mean_rate)) +
+  geom_line() +
+  theme_bw()
+
+```
+
+```{r}
+#-----Tentative de débruitage-----
+#Vérifier ces choix : on remplace les NA par des 0 et on ne sélectionne que les instruments avec une pd<=1
+anacredit_reduce <- anacredit %>%
+  mutate(percentage_protection = ifelse(is.na(percentage_protection), 0, percentage_protection)) %>%
+  filter(percentage_protection <= 1 & percentage_protection != Inf) %>%
+  mutate(LTV_INSTRMNT = ifelse(is.na(LTV_INSTRMNT), 0, LTV_INSTRMNT)) %>%
+  filter(!is.na(TYP_INSTRMNT)) %>%
+  filter(!is.na(ANNLSD_AGRD_RT))
+
+#On régresse
+reg_test <- lm(ANNLSD_AGRD_RT ~ LTV_INSTRMNT + TYP_INSTRMNT +  
+                 percentage_protection + OTSTNDNG_NMNL_AMNT_CV + ORGNL_MTRTY
+                 , data = anacredit_reduce)
+summary(reg_test)
+#Mais on trouve un R² très faible ...
+```
+
+```{r}
+#On récupère les résidus
+anacredit_reduce$ANNLSD_AGRD_RT_clean = reg_test$residuals
+
+#Représentation graphique
+rate_by_day_clean <- anacredit_reduce %>%
+  group_by(DT_INCPTN) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT_clean, na.rm = TRUE))
+
+
+ggplot(data = rate_by_day_clean,  aes(x = DT_INCPTN, y = mean_rate)) +
+  geom_line() +
+  theme_bw()
+# Pas d'amélioration particulière.--> si regarder les ordonnées et un peu quand même
+# On peut tenter d'ajouter à la regression l'oustanding amount et la maturité mais il 
+# faut clean ces variables d'abord
+```
+```{r}
+# En ajoutant outstanding amount et la maturité 
+sum(is.na(anacredit$OTSTNDNG_NMNL_AMNT_CV))
+sum(is.na(anacredit$ORGNL_MTRTY))
+summary(anacredit$OTSTNDNG_NMNL_AMNT_CV)
+summary(anacredit$ORGNL_MTRTY)
+```
+```{r}
+date_event = as.Date(c("2022-02-03", "2022-03-10", "2022-04-14", "2022-06-09",
+               "2022-07-21", "2022-09-08", "2022-10-27", "2022-12-15",
+               "2023-02-02", "2023-03-16", "2023-05-04", "2023-06-15"), format = "%Y%m%d") 
+```
+
+```{r}
+anacredit <- anacredit %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-02-03",
+                              floor(difftime(DT_INCPTN,"2022-02-03",  units = "days")),
+                                             -1
+                              )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-02-03",
+                              mean(ANNLSD_AGRD_RT[DT_INCPTN == "2022-02-02"], na.rm = TRUE),
+                              0
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-03-10",
+                              floor(difftime(DT_INCPTN,"2022-03-10",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-03-10",
+                             mean(ANNLSD_AGRD_RT[DT_INCPTN == "2022-03-09"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-04-14",
+                              floor(difftime(DT_INCPTN,"2022-04-14",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-04-14",
+                             mean(ANNLSD_AGRD_RT[DT_INCPTN == "2022-04-13"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-06-09",
+                              floor(difftime(DT_INCPTN,"2022-06-09",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-06-09",
+                             mean(ANNLSD_AGRD_RT[DT_INCPTN == "2022-06-08"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-07-21",
+                              floor(difftime(DT_INCPTN,"2022-07-21",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-07-21",
+                             mean(ANNLSD_AGRD_RT[DT_INCPTN == "2022-07-20"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-09-08",
+                              floor(difftime(DT_INCPTN,"2022-09-08",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-09-08",
+                             mean(ANNLSD_AGRD_RT[DT_INCPTN == "2022-09-07"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-10-27",
+                              floor(difftime(DT_INCPTN,"2022-10-27",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-10-27",
+                             mean(ANNLSD_AGRD_RT[DT_INCPTN == "2022-10-26"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-12-15",
+                              floor(difftime(DT_INCPTN,"2022-12-15",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-12-15",
+                             mean(ANNLSD_AGRD_RT[DT_INCPTN == "2022-12-14"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2023-02-02",
+                              floor(difftime(DT_INCPTN,"2023-02-02",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2023-02-02",
+                             mean(ANNLSD_AGRD_RT[DT_INCPTN == "2023-02-01"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2023-03-16",
+                              floor(difftime(DT_INCPTN,"2023-03-16",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2023-03-16",
+                             mean(ANNLSD_AGRD_RT[DT_INCPTN == "2023-03-15"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2023-05-04",
+                              floor(difftime(DT_INCPTN,"2023-05-04",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2023-05-04",
+                             mean(ANNLSD_AGRD_RT[DT_INCPTN == "2023-05-03"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2023-06-15",
+                              floor(difftime(DT_INCPTN,"2023-06-15",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2023-06-15",
+                             mean(ANNLSD_AGRD_RT[DT_INCPTN == "2023-06-14"], na.rm = TRUE),
+                             diff_rate
+  )) 
+  
+
+```
+
+```{r}
+#Vérification par représentation graphique
+
+diff_date_df <- anacredit %>%
+  group_by(DT_INCPTN) %>%
+  summarise(diff = mean(diff_event, na.rm = TRUE))
+
+ggplot(data = diff_date_df,  aes(x = DT_INCPTN, y = diff)) +
+  geom_line() +
+  theme_bw()
+```
+
+```{r}
+diff_rate_df <- anacredit %>%
+  group_by(DT_INCPTN) %>%
+  summarise(diff = mean(diff_rate, na.rm = TRUE))
+```
+
+## Statistiques descriptives
+
+```{r}
+# Pour les prêts qui sont des et other loan
+unique(anacredit$TYP_INSTRMNT)
+boxplot(ANNLSD_AGRD_RT~TYP_INSTRMNT, data=anacredit, subset=(TYP_INSTRMNT %in% c(71, 1004)))
+```
+
+```{r}
+unique(anacredit$PRPS)
+anacredit=anacredit%>%mutate(PRPS=ifelse(PRPS==-99, NA, PRPS))
+ggplot(data=subset(anacredit,!(PRPS %in% c(NA))), aes(x=as.character(PRPS)))+geom_bar()+theme_bw()
+```
+
+```{r}
+# Création d'une variable "nombre de banques"
+anacredit=anacredit%>%group_by(pseudonym_debtor)%>%mutate(Nb_banks=length(unique(pseudonym_creditor)))%>%ungroup()
+
+summary(anacredit$Nb_banks) # max=42 
+sum((anacredit$Nb_banks>=20)) # 9466 banques avec plus de vingt banques 
+sum((anacredit$Nb_banks==1)) # 4 402 554 entreprises avec une seule banque 
+ggplot(subset(anacredit, Nb_banks<=20), aes(x=Nb_banks))+geom_histogram()+theme_bw()
+```
+```{r}
+# Type de prêts parmi les entreprises n'ayant qu'une seule banque 
+ggplot(subset(anacredit, Nb_banks==1), aes(x=as.character(TYP_INSTRMNT)))+geom_bar()+theme_bw()
+```
+Pour les entreprises n'ayant qu'une seule banque, on observe beaucoup de Other Loans (1004) et Trade Receivables (71).
+
+```{r}
+# Création d'une variable "Durée de la relation avec la banque" et d'une variable "Fréquence de prêts entre l'entreprise i et la banque j"
+anacredit=anacredit%>%group_by(pseudonym_debtor)%>%group_by(pseudonym_creditor)%>%mutate(duration=time_length(interval(start=min(DT_INCPTN), end=max(DT_INCPTN)), unit="days"),
+                                                                                         frequency=length(unique(DT_INCPTN))/duration,
+                                                                                         nb_contracts=length(unique(DT_INCPTN)))%>%ungroup()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
