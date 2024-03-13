@@ -1,0 +1,403 @@
+---
+title: "Anacredit_analyse"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-03-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("readxl")
+library("here")
+library("FactoMineR")
+library("factoextra")
+library("lubridate")
+library("dplyr")
+library("tidyverse")
+library("readr")
+library("psych")
+library("magrittr")
+```
+
+```{r}
+# Ouverture de la base 
+anacredit=read_csv("D:/final_df_anonymous.csv")
+```
+
+```{r}
+# Mise en format des Inception date
+anacredit <- anacredit %>%
+  mutate(DT_INCPTN = as.Date(as.character(DT_INCPTN), format = "%Y%m%d"))
+```
+
+
+
+Statistiques descriptives 
+
+```{r}
+#Mis en format des Inception date
+anacredit <- anacredit %>%
+  mutate(DT_INCPTN = as.Date(as.character(DT_INCPTN), format = "%Y%m%d"))
+
+anacredit <- anacredit %>%
+  mutate(jour = weekdays(DT_INCPTN))
+```
+
+Première représentation des taux par jour 
+
+```{r}
+#-----Première représentation des taux par jour-----
+rate_by_day <- anacredit %>%
+  group_by(DT_INCPTN) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+
+ggplot(data = rate_by_day,  aes(x = DT_INCPTN, y = mean_rate)) +
+  geom_line() +
+  geom_vline(xintercept = as.numeric(as.Date("2022-02-03")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-03-10")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-04-14")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-06-09")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-07-21")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-09-08")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-10-27")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-12-15")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-02-02")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-03-16")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-05-04")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-06-15")), color = "red", linetype = "dashed") +
+  ylab("Taux moyen sur la journée") +
+  xlab("Date") +
+  theme_bw()
+
+```
+```{r}
+rate_by_day_week <- anacredit %>%
+  group_by(jour) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+
+rate_by_day_week <- rate_by_day_week %>%
+  arrange(jour)
+
+ggplot(data = rate_by_day_week, aes(x = jour, y = mean_rate)) +
+  geom_bar(stat="identity") +
+  theme_bw()
+
+```
+
+```{r}
+#-----Tentative de débruitage-----
+#Vérifier ces choix : on remplace les NA par des 0 et on ne sélectionne que les instruments avec une pd<=1
+anacredit_reduce <- anacredit %>%
+  mutate(percentage_protection = ifelse(is.na(percentage_protection), 0, percentage_protection)) %>%
+  filter(percentage_protection <= 1 & percentage_protection != Inf) %>%
+  mutate(LTV_INSTRMNT = ifelse(is.na(LTV_INSTRMNT), 0, LTV_INSTRMNT)) %>%
+  filter(!is.na(TYP_INSTRMNT)) %>%
+  filter(!is.na(ANNLSD_AGRD_RT))
+
+#On régresse
+reg_test <- lm(ANNLSD_AGRD_RT ~ LTV_INSTRMNT + TYP_INSTRMNT +  
+                 percentage_protection + OTSTNDNG_NMNL_AMNT_CV + ORGNL_MTRTY + jour
+                 , data = anacredit_reduce)
+summary(reg_test)
+#Mais on trouve un R² très faible ...
+```
+
+```{r}
+#On récupère les résidus
+anacredit_reduce$ANNLSD_AGRD_RT_clean = reg_test$residuals
+
+#Représentation graphique
+rate_by_day_clean <- anacredit_reduce %>%
+  group_by(DT_INCPTN) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT_clean, na.rm = TRUE))
+
+
+ggplot(data = rate_by_day_clean,  aes(x = DT_INCPTN, y = mean_rate)) +
+  geom_line() +
+  theme_bw()
+# Pas d'amélioration particulière.--> si regarder les ordonnées et un peu quand même
+# On peut tenter d'ajouter à la regression l'oustanding amount et la maturité mais il 
+# faut clean ces variables d'abord
+```
+
+```{r}
+anacredit_cc <- anacredit_reduce %>%
+  filter(TYP_INSTRMNT == 71)
+
+rate_by_day_cc <- anacredit_cc %>%
+  group_by(DT_INCPTN) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+
+ggplot(data = rate_by_day_cc,  aes(x = DT_INCPTN, y = mean_rate)) +
+  geom_line() +
+  theme_bw()
+
+anacredit_cc <- anacredit_cc %>%
+  mutate(be_sunday = ifelse( jour == "Sunday", 1,0)) %>%
+  mutate(be_saturday = ifelse(jour == "Saturday", 1, 0))
+
+
+reg_test_cc <- lm(ANNLSD_AGRD_RT ~ LTV_INSTRMNT + TYP_INSTRMNT +  
+                 percentage_protection + OTSTNDNG_NMNL_AMNT_CV + ORGNL_MTRTY + be_sunday + be_saturday
+                 , data = anacredit_cc)
+summary(reg_test_cc)
+```
+
+
+```{r}
+
+anacredit_cc$ANNLSD_AGRD_RT_clean <- reg_test_cc$residuals
+
+#Représentation graphique
+rate_by_day_clean_cc <- anacredit_cc %>%
+  group_by(DT_INCPTN) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT_clean, na.rm = TRUE))
+
+
+ggplot(data = rate_by_day_clean_cc,  aes(x = DT_INCPTN, y = mean_rate)) +
+  geom_line() +
+  theme_bw()
+
+```
+
+```{r}
+
+rate_by_day_clean_cc <- anacredit_cc %>%
+  group_by(jour) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT_clean, na.rm = TRUE))
+
+ggplot(data = rate_by_day_clean_cc, aes(x = jour, y = mean_rate)) +
+  geom_bar(stat="identity") +
+  theme_bw()
+
+```
+
+
+
+
+```{r}
+
+anacredit_cc <- anacredit_cc %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-02-03",
+                              floor(difftime(DT_INCPTN,"2022-02-03",  units = "days")),
+                                             -1
+                              )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-02-03",
+                              ANNLSD_AGRD_RT_clean - mean(ANNLSD_AGRD_RT_clean[DT_INCPTN == "2022-02-02"], na.rm = TRUE),
+                              0
+  )) %>%
+  mutate(date_event = ifelse(DT_INCPTN >= "2022-02-03",
+                              "2022-02-03",
+                              "2022-01-01"
+  )) %>%
+  
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-03-10",
+                              floor(difftime(DT_INCPTN,"2022-03-10",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-03-10",
+                             ANNLSD_AGRD_RT_clean - mean(ANNLSD_AGRD_RT_clean[DT_INCPTN == "2022-03-09"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate(date_event = ifelse(DT_INCPTN >= "2022-03-10",
+                              "2022-03-10",
+                              date_event
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-04-14",
+                              floor(difftime(DT_INCPTN,"2022-04-14",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-04-14",
+                             ANNLSD_AGRD_RT_clean - mean(ANNLSD_AGRD_RT_clean[DT_INCPTN == "2022-04-13"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate(date_event = ifelse(DT_INCPTN >= "2022-04-14",
+                              "2022-04-14",
+                              date_event
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-06-09",
+                              floor(difftime(DT_INCPTN,"2022-06-09",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-06-09",
+                             ANNLSD_AGRD_RT_clean - mean(ANNLSD_AGRD_RT_clean[DT_INCPTN == "2022-06-08"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate(date_event = ifelse(DT_INCPTN >= "2022-06-09",
+                              "2022-06-09",
+                              date_event
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-07-21",
+                              floor(difftime(DT_INCPTN,"2022-07-21",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-07-21",
+                             ANNLSD_AGRD_RT_clean - mean(ANNLSD_AGRD_RT_clean[DT_INCPTN == "2022-07-20"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate(date_event = ifelse(DT_INCPTN >= "2022-07-21",
+                              "2022-07-21",
+                              date_event
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-09-08",
+                              floor(difftime(DT_INCPTN,"2022-09-08",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-09-08",
+                             ANNLSD_AGRD_RT_clean - mean(ANNLSD_AGRD_RT_clean[DT_INCPTN == "2022-09-07"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate(date_event = ifelse(DT_INCPTN >= "2022-09-08",
+                              "2022-09-08",
+                              date_event
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-10-27",
+                              floor(difftime(DT_INCPTN,"2022-10-27",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-10-27",
+                             ANNLSD_AGRD_RT_clean - mean(ANNLSD_AGRD_RT_clean[DT_INCPTN == "2022-10-26"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate(date_event = ifelse(DT_INCPTN >= "2022-10-27",
+                              "2022-10-27",
+                              date_event
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2022-12-15",
+                              floor(difftime(DT_INCPTN,"2022-12-15",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2022-12-15",
+                             ANNLSD_AGRD_RT_clean - mean(ANNLSD_AGRD_RT_clean[DT_INCPTN == "2022-12-14"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate(date_event = ifelse(DT_INCPTN >= "2022-12-15",
+                              "2022-12-15",
+                              date_event
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2023-02-02",
+                              floor(difftime(DT_INCPTN,"2023-02-02",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2023-02-02",
+                             ANNLSD_AGRD_RT_clean - mean(ANNLSD_AGRD_RT_clean[DT_INCPTN == "2023-02-01"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate(date_event = ifelse(DT_INCPTN >= "2023-02-02",
+                              "2023-02-02",
+                              date_event
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2023-03-16",
+                              floor(difftime(DT_INCPTN,"2023-03-16",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2023-03-16",
+                             ANNLSD_AGRD_RT_clean - mean(ANNLSD_AGRD_RT_clean[DT_INCPTN == "2023-03-15"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+   mutate(date_event = ifelse(DT_INCPTN >= "2023-03-16",
+                              "2023-03-16",
+                              date_event
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2023-05-04",
+                              floor(difftime(DT_INCPTN,"2023-05-04",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2023-05-04",
+                             ANNLSD_AGRD_RT_clean - mean(ANNLSD_AGRD_RT_clean[DT_INCPTN == "2023-05-03"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate(date_event = ifelse(DT_INCPTN >= "2023-05-04",
+                              "2023-05-04",
+                              date_event
+  )) %>%
+  mutate( diff_event = ifelse(DT_INCPTN >= "2023-06-15",
+                              floor(difftime(DT_INCPTN,"2023-06-15",  units = "days")),
+                              diff_event
+  )) %>%
+  mutate( diff_rate = ifelse(DT_INCPTN >= "2023-06-15",
+                             ANNLSD_AGRD_RT_clean - mean(ANNLSD_AGRD_RT_clean[DT_INCPTN == "2023-06-14"], na.rm = TRUE),
+                             diff_rate
+  )) %>%
+  mutate(date_event = ifelse(DT_INCPTN >= "2023-06-15",
+                              "2023-06-15",
+                              date_event
+  )) 
+```
+
+```{r}
+
+diff_date_df <- anacredit_cc %>%
+  group_by(DT_INCPTN) %>%
+  summarise(diff = mean(diff_event, na.rm = TRUE))
+
+ggplot(data = diff_date_df,  aes(x = DT_INCPTN, y = diff)) +
+  geom_line() +
+  theme_bw()
+
+```
+```{r}
+ 
+diff_rate_df <- anacredit_cc %>%
+  group_by(DT_INCPTN) %>%
+  summarise(diff = mean(diff_rate, na.rm = TRUE))
+
+#Graph inutile
+ggplot(data = diff_rate_df,  aes(x = DT_INCPTN, y = diff)) +
+  geom_line() +
+  geom_vline(xintercept = as.numeric(as.Date("2022-02-03")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-03-10")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-04-14")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-06-09")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-07-21")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-09-08")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-10-27")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-12-15")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-02-02")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-03-16")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-05-04")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-06-15")), color = "red", linetype = "dashed") +
+  theme_bw()
+
+diff_rate_diff_date <- anacredit_cc %>%
+  group_by(diff_event) %>%
+  summarise(diff = mean(diff_rate, na.rm = TRUE))
+diff_rate_diff_date <- diff_rate_diff_date %>%
+  filter(diff_event <= 30)
+
+ggplot(data = diff_rate_diff_date,  aes(x = diff_event, y = diff)) +
+  geom_line() +
+  theme_bw()
+  
+```
+
+```{r}
+
+df_test <- anacredit_cc %>%
+  group_by(DT_INCPTN) %>%
+  summarise(mean_diff_rate = mean(diff_rate))
+
+
+
+ggplot(data = df_test,  aes(x = DT_INCPTN, y = mean_diff_rate)) +
+  geom_point() +
+  geom_vline(xintercept = as.numeric(as.Date("2022-02-03")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-03-10")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-04-14")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-06-09")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-07-21")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-09-08")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-10-27")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-12-15")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-02-02")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-03-16")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-05-04")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-06-15")), color = "red", linetype = "dashed") +
+  theme_bw() +
+  xlim(as.Date(c("2022-05-01", "2022-10-01")))
+
+```
