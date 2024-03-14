@@ -22,6 +22,11 @@ library("MASS")
 install.packages("NlcOptim")
 library("NlcOptim")
 library(tidyr)
+library("stats")
+install.packages("astsa")
+library("astsa")
+install.packages("forecast")
+library("forecast")
 ```
 
 ```{r}
@@ -370,7 +375,7 @@ results_table_F2_PR_R <- t(as.data.frame(results_F2_PR_R))
 print(results_table_F1_PR_R)
 print(results_table_F2_PR_R)
 ```
-On a bien F2 parfaitement aligné avec les OIS 1M. En revanche, les R² ont légèrement baissé.
+On a bien F2 parfaitement aligné avec les OIS 1M. En revanche, les R² ont légèrement baissé. On remarque que le deuxième facteur est corrélé négativement avec les OIS de maturité supérieure à 2 ans.
 
 ```{r}
 results_F1_PC_R <- sapply(vars_PC, function(var) get_regression_results(press_conference_R, var, "F1"))
@@ -421,7 +426,7 @@ Forecast_2012=Forecast%>%filter(year>=2011)
 
 ```{r}
 # Evolution de l'IPCH
-ggplot(HICP_2012,aes(x=date, y=HICP))+geom_line()
+ggplot(HICP_2012,aes(x=date, y=HICP))+geom_line()+theme_bw()
 
 ```
 
@@ -477,12 +482,97 @@ test2
 rotate_factors$HICP_forecast=test2
 ```
 
+```{r}
+model_Forecast2=lm(F2~HICP_forecast, data=rotate_factors)
+model_Forecast1=lm(F1~HICP_forecast, data=rotate_factors)
+
+summary(model_Forecast2)
+summary(model_Forecast1)
+```
+## Contrôle des anticipations
+
+D'après le cours de séries temp, avant de calculer les autocorrélations il faut vérifier que la série est stationaire. Si ce n'est pas le cas, il faut lui appliquer une transformation pour la rendre stationnaire.
+
+```{r}
+# Stationnarité de nos deux vecteurs (Box Ljung-test)
+box_test_F2=Box.test(F2, type="Ljung-Box")
+box_test_F2
+# P-value élevée, donc on ne peut pas rejeter l'hypothèse nulle : la série est stationnaire (?).
+box_test_F1=Box.test(F1, type="Ljung-Box")
+box_test_F1
+# La p-value est très faible, on rejette l'hypothèse nulle : la série n'est pas stationnaire. Il faut donc la stationariser.
+```
+```{r}
+# Autre test 
+library("tseries")
+adf.test(F2)
+# p-value égale à 2% donc on rejette l'hypothèse nulle : on retrouve que F2 est stationnaire
+adf.test(F1)
+# p-value très faible aussi (j'y comprends rien) : F1 serait aussi déjà stationnaire...
+```
 
 
+```{r}
+# Inutile (?)
+F1_diff=diff(rotate_factors$F1,lag=1)
+F2_diff=diff(rotate_factors$F2, lag=1)
+rotate_diff=data.frame(F1_diff, F2_diff, date=rotate_factors$date[-1])
 
 
+ggplot(rotate_diff,aes(x=date))+
+  geom_line(aes(y=F1_diff, color="First_Dimension"))+
+  geom_line(aes(y=F2_diff, color="Second_Dimension"))+
+  scale_color_manual(values=c(First_Dimension="cadetblue4", Second_Dimension="brown4"), labels=c("Dimension 1","Dimension 2"), name="Légende")+
+  labs(x="Dates des annonces monétaires", y="Componsantes de l'annonce")+
+  theme_bw()
+```
 
 
+```{r}
+# Calcul des autocorrélations et autocorrélations partielles de la série non différenciée
+acf(F1)
+pacf(F1)
+acf(F2)
+pacf(F2)
+```
+
+
+```{r}
+# Calcul des autocorrélations et autocorrélations partielles 2
+acf(F1_diff, main="ACF de F1", lag.max=20)
+acf(F2_diff, main="ACF de F2", lag.max=20)
+pacf(F1_diff, main="PACF de F1")
+pacf(F2_diff, main="PACF de F2")
+```
+On remarque que les autocorrélations pour F2 (Target) sont nulles presque sûrement à partir de h>q=2. Pour F1 (supposé FG), on trouve q=4.
+Les autocorrélations partielles pour F2 et F1 sont nulles à partir de h>p=4.
+On recherche donc un modèle ARMA(4,4) pour F2 et ARMA(4,2) pour F1. 
+
+```{r}
+# Avec la méthode ChatGPT
+arima_F2=auto.arima(F2_diff, d=1)
+summary(arima_F2)
+# Sans préciser d : on retient un MA(1), donc bruit blanc... (?pas d'anticipations?)
+# En précisant d=1 : on retient un AR(5), donc anticipations...
+arima_F1=auto.arima(F1_diff, d=1)
+summary(arima_F1)
+# Sans préciser d : on retient un ARMA(3,1)
+# En précisant d=1 : on retient aussi un AR(5)
+
+# CONCLUSION : on retient les valeurs pour d=1 car on a déjà différencié les données. (?)
+```
+
+```{r}
+summary(auto.arima(F2))
+summary(auto.arima(F1))
+```
+
+
+```{r}
+# Avec la méthode du cours
+res42=sarima(F2_diff, 4,1,2, details=FALSE)
+```
+Tous les arx sont significatifs à tous les seuils. 
 
 
 
