@@ -27,6 +27,8 @@ install.packages("astsa")
 library("astsa")
 install.packages("forecast")
 library("forecast")
+install.packages("portes")
+library("portes")
 ```
 
 ```{r}
@@ -491,6 +493,8 @@ summary(model_Forecast1)
 ```
 ## Contrôle des anticipations
 
+Objectif : nettoyer le facteur Target des éventuelles anticipations. On regarde aussi par curiosité et pour l'interprétation ce qui en est de l'autre facteur.
+
 D'après le cours de séries temp, avant de calculer les autocorrélations il faut vérifier que la série est stationaire. Si ce n'est pas le cas, il faut lui appliquer une transformation pour la rendre stationnaire.
 
 ```{r}
@@ -530,32 +534,92 @@ ggplot(rotate_diff,aes(x=date))+
 
 ```{r}
 # Calcul des autocorrélations et autocorrélations partielles de la série non différenciée
-acf(F1)
-pacf(F1)
-acf(F2)
-pacf(F2)
+acf_1=acf(F1, main="ACF de F1") 
+pacf_1=pacf(F1, main="PACF de F1")
+acf_2=acf(F2, main="ACF de F2")
+pacf_2=pacf(F2, main="PACF de F2")
+```
+D'après ces graphes, on devrait prendre pour F1, q=3 et p=1 (quitte à diminuer l'ordre de q parce qu'on ne veut pas s'encombrer de trop de variables et que ça n'a pas beaucoup de sens). Pour F2, on prend q=1 et p=5. Vu l'allure du corrélogramme de la PACF, il faudrait aussi mieux considérer F2_diff. 
+
+```{r}
+# Valeurs des autocorrélations et autocorrélations partielles pour le facteur Target
+acf_2$acf[1:10]
+pacf_2$acf[1:10]
 ```
 
 
 ```{r}
 # Calcul des autocorrélations et autocorrélations partielles 2
-acf(F1_diff, main="ACF de F1", lag.max=20)
-acf(F2_diff, main="ACF de F2", lag.max=20)
-pacf(F1_diff, main="PACF de F1")
-pacf(F2_diff, main="PACF de F2")
+acf_1_diff=acf(F1_diff, main="ACF de F1_diff", lag.max=20)
+acf_2_diff=acf(F2_diff, main="ACF de F2_diff", lag.max=20)
+pacf_1_diff=pacf(F1_diff, main="PACF de F1_diff")
+pacf_2_diff=pacf(F2_diff, main="PACF de F2_diff")
 ```
 On remarque que les autocorrélations pour F2 (Target) sont nulles presque sûrement à partir de h>q=2. Pour F1 (supposé FG), on trouve q=4.
 Les autocorrélations partielles pour F2 et F1 sont nulles à partir de h>p=4.
 On recherche donc un modèle ARMA(4,4) pour F2 et ARMA(4,2) pour F1. 
 
 ```{r}
-# Avec la méthode ChatGPT
-arima_F2=auto.arima(F2_diff, d=1)
-summary(arima_F2)
+acf_2_diff$acf
+pacf_2_diff$acf
+```
+
+```{r}
+# Test de différents modèles pour F2
+
+res52=sarima(F2,5,0,2, details=FALSE)
+# P-value uniquement inférieure à 5% pour ar1
+res12=sarima(F2,1,0,2, details=FALSE)
+# P-value supérieure à 10% pour ma2
+res11=sarima(F2, 1,0,1, details=FALSE)
+# On retrouve des p-value énormes, j'y comprends rien.
+```
+```{r}
+# ARMA(1,2)
+LjungBox(res12$fit)
+# Le modèle ARMA(1,2) n'est pas rejeté. 
+AIC(res12$fit)
+BIC(res12$fit)
+# Les critères d'informations sont très hauts.
+
+# ARMA(1,1)
+LjungBox(res11$fit)
+# La p-valeur inférieure à 10% pour la première ligne laisse penser que c'est pas gégène de retenir ce modèle. 
+```
+```{r}
+# Tests de différents modèles pour F2_diff
+
+res42_diff=sarima(F2, 4, 1, 2, details=FALSE)
+# P-value inférieures à 10% pour ar1, ar2 et ar3
+res30_diff=sarima(F2,3,1,0, details=FALSE)
+# P-value toutes presque nulles (sauf constante)
+res20_diff=sarima(F2,2,1,0, details=FALSE)
+# Idem
+res21_diff=sarima(F2,2,1,1, details=FALSE)
+```
+
+```{r}
+LjungBox(res20_diff$fit)
+# p-valeurs assez basses:on ne dirait pas qu'il faille retenir ce modèle
+LjungBox(res30_diff$fit)
+# Idem
+LjungBox(res21_diff$fit)
+# Les p-valeurs sont plus élevées, mais du coup je ne comprends pas trop pourquoi avant elles étaient aussi élevées pour ce modèle (avec sarima).
+AIC(res21_diff$fit)
+BIC(res21_diff$fit)
+# On n'a toujours pas des critères d'information très gégènes.
+```
+
+
+```{r}
+# Avec la fonction auto.arima
+
+arima_F2_diff=auto.arima(F2_diff, d=1)
+summary(arima_F2_diff)
 # Sans préciser d : on retient un MA(1), donc bruit blanc... (?pas d'anticipations?)
 # En précisant d=1 : on retient un AR(5), donc anticipations...
-arima_F1=auto.arima(F1_diff, d=1)
-summary(arima_F1)
+arima_F1_diff=auto.arima(F1_diff, d=1)
+summary(arima_F1_diff)
 # Sans préciser d : on retient un ARMA(3,1)
 # En précisant d=1 : on retient aussi un AR(5)
 
@@ -566,13 +630,21 @@ summary(arima_F1)
 summary(auto.arima(F2))
 summary(auto.arima(F1))
 ```
-
+Les valeurs du modèle ARIMA qui minimisent les critères d'information sont un AR(2,1,1) pour F2 et un AR(1) pour F1. On retrouve l'idée que F2 n'est peut être pas stationnaire dès le départ et qu'il est plus pertinent de prendre Delta(F2). Ces modèles proposés sont assez parcimonieux. Ce qui me paraît plus surprenant c'est que le modèle retient plus de variable sur ce qui est supposé être la surprise que sur ce qui est supposé être la FG (et donc devrait plus être influencé par les décisions précédentes).
 
 ```{r}
-# Avec la méthode du cours
-res42=sarima(F2_diff, 4,1,2, details=FALSE)
+# Artisanalement : régression de X_t sur X_t-1
+
+# "Forward Guidance"
+model_F1=lm(F1[-1] ~ F1[-length(F1)])
+summary(model_F1)
+
+# Target
+model_F2=lm(F2[-1] ~ F2[-length(F2)])
+summary(model_F2)
 ```
-Tous les arx sont significatifs à tous les seuils. 
+Le coefficient associé à F1(t-1) dans la régression est négatif, égal à -0.527 et est significatif à tous les seuils. Le R² est aussi relativement élevé (pour une seule variable explicative), égal à 27%. On retrouve bien des anticipations en ce qui concerne le coefficient censé représenter la FG.
+Dans la régression de F2 sur F2(t-1), le coefficient trouvé est négatif, assez faible (un ordre de grandeur de moins que pour F1) et surtout n'est pas significatif. C'est plutôt encourageant, car cela laisse penser qu'il n'y a pas d'anticipations. En revanche, ce n'est pas super cohérent avec ce que nous donnait la fonction auto.arima. 
 
 
 
