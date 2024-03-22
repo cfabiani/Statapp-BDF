@@ -107,6 +107,27 @@ summary(reg_test)
 ```
 
 ```{r}
+#-----Autre tentative de débruitage-----
+# Installer le package zoo s'il n'est pas déjà installé
+# install.packages("zoo")
+
+# Charger le package zoo
+library(zoo)
+
+# Définir la fenêtre pour la moyenne mobile (moving average)
+window_size <- 5
+
+# Calculer la moyenne mobile
+smoothed_mean_rate <- rollmean(mean_rate, k = window_size, align = "center", fill = NA)
+
+# Tracer les données bruitées et les données lissées
+plot(DT_INCPTN, mean_rate, type = "l", col = "blue", ylim = c(min(mean_rate), max(mean_rate)), xlab = "DT_INCPTN", ylab = "mean_rate", main = "Courbe bruitée et lissée")
+lines(DT_INCPTN, smoothed_mean_rate, col = "red")
+legend("topright", legend = c("Données bruitées", "Données lissées"), col = c("blue", "red"), lty = 1)
+```
+
+
+```{r}
 #On récupère les résidus
 anacredit_reduce$ANNLSD_AGRD_RT_clean = reg_test$residuals
 
