@@ -30,7 +30,10 @@ anacredit=read_csv("D:/final_df_anonymous.csv")
 ```{r}
 # Mise en format des Inception date
 anacredit <- anacredit %>%
-  mutate(DT_INCPTN = as.Date(as.character(DT_INCPTN), format = "%Y%m%d"))
+  mutate(DT_INCPTN = as.Date(as.character(DT_INCPTN), format = "%Y%m%d"),
+         jour=weekdays(DT_INCPTN),
+         mois=month(DT_INCPTN))
+
 ```
 
 ```{r}
@@ -42,8 +45,206 @@ rate_by_day <- anacredit %>%
 ggplot(data = rate_by_day,  aes(x = DT_INCPTN, y = mean_rate)) +
   geom_line() +
   theme_bw()
+```
+
+
+```{r}
+# Graphe de l'évolution des taux faisant apparaître les dates d'annonce de politique monétaire
+
+ggplot(data = rate_by_day,  aes(x = DT_INCPTN, y = mean_rate)) +
+  geom_line() +
+  geom_vline(xintercept = as.numeric(as.Date("2022-02-03")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-03-10")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-04-14")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-06-09")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-07-21")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-09-08")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-10-27")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2022-12-15")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-02-02")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-03-16")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-05-04")), color = "red", linetype = "dashed") +
+  geom_vline(xintercept = as.numeric(as.Date("2023-06-15")), color = "red", linetype = "dashed") +
+  ylab("Taux moyen sur la journée") +
+  xlab("Date") +
+  theme_bw()
+```
+
+```{r}
+# Représentation de l'évolution des taux moyens par jour pour les prêts 71 (Trade receivables) et 1004 (Other Loans)
+
+rate_by_day_ST=anacredit%>%
+  filter(TYP_INSTRMNT %in% c(71, 1004))%>%
+  group_by(DT_INCPTN) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+
+ggplot(data = rate_by_day_ST,  aes(x = DT_INCPTN, y = mean_rate)) +
+  geom_line() +
+  theme_bw()
+```
+```{r}
+ggplot(rate_by_day, aes(x = DT_INCPTN, y = mean_rate)) +
+  geom_line(color = "blue") +
+  geom_line(data = rate_by_day_ST, aes(x = DT_INCPTN, y = mean_rate), color = "red")+
+  theme_bw()
+```
+```{r}
+# Visualisation des taux moyens en fonction de la taille de l'entreprise
+rate_by_scale=anacredit%>%
+  group_by(large_firm)%>%
+  summarise(mean_rate=mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+
+ggplot(data=rate_by_scale, aes(x=as.character(large_firm), y=mean_rate))+geom_bar(stat="identity")+theme_bw()
+
+sum(is.na(anacredit$large_firm)) # 322 604 NA 
+```
+En moyenne, les taux sont légèrement plus élevés pour les entreprises les plus petites.
+
+```{r}
+rate_by_day_large=anacredit%>%
+  filter(large_firm==1)%>%
+  group_by(DT_INCPTN)%>%
+  summarise(mean_rate_large=mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+
+rate_by_day_small=anacredit%>%
+  filter(large_firm==0)%>%
+  group_by(DT_INCPTN)%>%
+  summarise(mean_rate_small=mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+
+ggplot(rate_by_day_large, aes(x = DT_INCPTN, y = mean_rate_large)) +
+  geom_line(color = "blue") +
+  geom_line(data = rate_by_day_small, aes(x = DT_INCPTN, y = mean_rate_small), color = "red")+
+  theme_bw()
+```
+Ce n'est pas exactement les mêmes variations de taux, on dirait que l'amplitude est plus élevée pour les petites entreprises. 
+
+```{r}
+# Visualisation des taux moyens en fonction des jours de la semaine
+rate_by_day_week <- anacredit %>%
+  group_by(jour) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+
+rate_by_day_week <- rate_by_day_week %>%
+  arrange(jour)
+
+ggplot(data = rate_by_day_week, aes(x = jour, y = mean_rate)) +
+  geom_bar(stat="identity") +
+  theme_bw()
+```
+Les taux sont en moyenne particulièrement bas les dimanche en comparaison avec les autres jours de la semaine où ils sont compris entre 0.35 et 0.4. On peut donc nettoyer en prenant en compte les dimanche.
+
+```{r}
+# Visualisation des taux moyens en fonction des mois 
+rate_by_month <- anacredit %>%
+  group_by(mois) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+
+rate_by_month <- rate_by_month %>%
+  arrange(mois)
+
+ggplot(data = rate_by_month, aes(x = as.character(mois), y = mean_rate)) +
+  geom_bar(stat="identity") +
+  theme_bw()
+```
+
+Le dataset commence au premier janvier 2022 et se termine le 30 novembre 2023. Donc, à l'exception du mois de décembre, tous les mois apparaissent exactement deux fois dans la base de données (en 2022 et 2023). Je ne sais pas si ce que l'on observe (des taux qui montent pour atteindre un max en octobre-novembre) peut être considéré comme de la saisonnalité. Est-ce qu'il y a un équivalent d'annualité budgétaire ? 
+
+
+
+```{r}
+# Débruitage progressif 1
+anacredit_reg=anacredit%>%filter(!is.na(ANNLSD_AGRD_RT))%>%
+  mutate(is_sunday=1*(jour=="dimanche"),
+         is_small=1*(large_firm==0))%>%
+  filter(!is.na(is_small))
+
+reg1=lm(ANNLSD_AGRD_RT~is_sunday+is_small, data=anacredit_reg)
+summary(reg1)
+```
+
+```{r}
+rate_by_day_high_protect=anacredit%>%
+  filter(NMBR_PRTCTN>1)%>%
+  group_by(DT_INCPTN)%>%
+  summarise(mean_rate=mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+
+rate_by_day_low_protect=anacredit%>%
+  filter(NMBR_PRTCTN<=1)%>%
+  group_by(DT_INCPTN)%>%
+  summarise(mean_rate=mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+
+ggplot(rate_by_day_high_protect, aes(x = DT_INCPTN, y = mean_rate)) +
+  geom_line(color = "blue") +
+  geom_line(data = rate_by_day_low_protect, aes(x = DT_INCPTN, y = mean_rate), color = "red")+
+  theme_bw()
+```
+
+```{r}
+mean(subset(anacredit, NMBR_PRTCTN>1)$ANNLSD_AGRD_RT, na.rm=TRUE)
+mean(subset(anacredit, NMBR_PRTCTN<=1)$ANNLSD_AGRD_RT, na.rm=TRUE)
+```
+```{r}
+# Débruitage progressif 2
+anacredit_reg=anacredit_reg%>%mutate(low_protect=1*(NMBR_PRTCTN<=1))
+
+reg2=lm(ANNLSD_AGRD_RT~is_sunday+is_small+low_protect, data=anacredit_reg)
+summary(reg2)
+```
+```{r}
+# Visualisation de débruitage progressif 2
+rate_by_day_clean = anacredit_reg %>%
+  mutate(ANNLSD_AGRD_RT_clean = reg2$residuals)%>%
+  group_by(DT_INCPTN) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT_clean, na.rm = TRUE))
+
+
+ggplot(data = rate_by_day_clean,  aes(x = DT_INCPTN, y = mean_rate)) +
+  geom_line() +
+  theme_bw()
+```
+
+```{r}
+# Taux en fonction de la probabilité de défaut
+rate_by_PD=anacredit%>%filter(!is.na(PD_DBTR)&!is.na(ANNLSD_AGRD_RT)& ANNLSD_AGRD_RT>-50 )%>%select(DT_INCPTN, ANNLSD_AGRD_RT, PD_DBTR)%>%arrange(PD_DBTR)
+
+ggplot(rate_by_PD, aes(x=PD_DBTR, y=ANNLSD_AGRD_RT))+geom_line()+theme_bw()
 
 ```
+
+Les taux sont plus élevés pour les probabilités de défaut les plus faibles. On pourrait essayer de nettoyer les données en ajoutant une indicatrice de seuil pour la PD, par exemple PD<1.
+
+```{r}
+# Ajout d'une variable relative à la probabilité de défaut
+anacredit_reg=anacredit_reg%>%
+  filter(!is.na(PD_DBTR))%>%
+  mutate(low_PD=1*(PD_DBTR<=1))
+
+reg3=lm(ANNLSD_AGRD_RT~is_sunday+is_small+low_protect+low_PD, data=anacredit_reg)
+summary(reg3)
+```
+```{r}
+# Visualisation de débruitage progressif 3
+rate_by_day_clean3= anacredit_reg %>%
+  mutate(ANNLSD_AGRD_RT_clean = reg3$residuals)%>%
+  group_by(DT_INCPTN) %>%
+  summarise(mean_rate = mean(ANNLSD_AGRD_RT_clean, na.rm = TRUE))
+
+
+ggplot(data = rate_by_day_clean3,  aes(x = DT_INCPTN, y = mean_rate)) +
+  geom_line() +
+  theme_bw()
+```
+L'évolution des taux moyens a beaucoup changé de tête, mais on ne peut pas dire que les amplitudes aient diminué. J'ai l'impression qu'on a un peu nettoyé avant 2023...
+
+```{r}
+# Evolution temporelle de la probabilité de défaut moyenne
+PD_by_day=anacredit%>% group_by(DT_INCPTN)%>%summarise(mean_pd=mean(PD_DBTR, na.rm = TRUE))
+
+ggplot(data = PD_by_day,  aes(x = DT_INCPTN, y = mean_pd)) +
+  geom_line() +
+  theme_bw()
+```
+
 
 ```{r}
 #-----Tentative de débruitage-----
@@ -53,11 +254,12 @@ anacredit_reduce <- anacredit %>%
   filter(percentage_protection <= 1 & percentage_protection != Inf) %>%
   mutate(LTV_INSTRMNT = ifelse(is.na(LTV_INSTRMNT), 0, LTV_INSTRMNT)) %>%
   filter(!is.na(TYP_INSTRMNT)) %>%
-  filter(!is.na(ANNLSD_AGRD_RT))
+  filter(!is.na(ANNLSD_AGRD_RT))%>%
+  mutate(is_sunday=(jour=="dimanche")*1)
 
 #On régresse
 reg_test <- lm(ANNLSD_AGRD_RT ~ LTV_INSTRMNT + TYP_INSTRMNT +  
-                 percentage_protection + OTSTNDNG_NMNL_AMNT_CV + ORGNL_MTRTY
+                 percentage_protection + OTSTNDNG_NMNL_AMNT_CV + ORGNL_MTRTY+is_sunday
                  , data = anacredit_reduce)
 summary(reg_test)
 #Mais on trouve un R² très faible ...
@@ -87,6 +289,14 @@ sum(is.na(anacredit$ORGNL_MTRTY))
 summary(anacredit$OTSTNDNG_NMNL_AMNT_CV)
 summary(anacredit$ORGNL_MTRTY)
 ```
+
+```{r}
+rate_by_instrument=anacredit%>%group_by(TYP_INSTRMNT)%>%summarize(mean_rate=mean(ANNLSD_AGRD_RT, na.rm = TRUE))
+ggplot(data=rate_by_instrument, aes(x=as.character(TYP_INSTRMNT), y=mean_rate))+geom_bar(stat="identity")+theme_bw()
+```
+Ce n'est pas très informatif. On va essayer de voir si les variations des taux sont dues à certains types d'instruments en particulier. 
+
+
 ```{r}
 date_event = as.Date(c("2022-02-03", "2022-03-10", "2022-04-14", "2022-06-09",
                "2022-07-21", "2022-09-08", "2022-10-27", "2022-12-15",
